@@ -138,8 +138,8 @@ html,body{height:100%;font-family:'Poppins',sans-serif;background:var(--bg);colo
   width:38px;height:38px;border-radius:8px;display:flex;align-items:center;
   justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;
 }
-.mi-fb{background:var(--fb-dim);color:var(--fb);}
-.mi-gg{background:var(--gg-dim);color:var(--gg);}
+.mi-fb{background:rgba(24,119,242,.1);color:#1877F2;}
+.mi-gg{background:rgba(11,128,67,.1);color:#0B8043;}
 .medio-body{flex:1;}
 .medio-name{font-size:13px;font-weight:700;margin-bottom:8px;}
 .medio-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
@@ -267,16 +267,16 @@ td:first-child{text-align:left;}
 <div class="filters">
   <div class="fg">
     <span class="fl">Desde</span>
-    <input type="date" id="fDesde" class="fi">
+    <input type="date" id="fDesde" class="fi" onchange="applyFilters()">
   </div>
   <div class="fg">
     <span class="fl">Hasta</span>
-    <input type="date" id="fHasta" class="fi">
+    <input type="date" id="fHasta" class="fi" onchange="applyFilters()">
   </div>
   <div class="fsep"></div>
   <div class="fg">
     <span class="fl">Nivel</span>
-    <select id="fNivel" class="fs">
+    <select id="fNivel" class="fs" onchange="applyFilters()">
       <option value="">Todos</option>
       <option value="Posgrado">Posgrado</option>
       <option value="Pregrado">Pregrado</option>
@@ -284,15 +284,15 @@ td:first-child{text-align:left;}
   </div>
   <div class="fg">
     <span class="fl">Ciudad</span>
-    <select id="fCiudad" class="fs"><option value="">Todas</option></select>
+    <select id="fCiudad" class="fs" onchange="applyFilters()"><option value="">Todas</option></select>
   </div>
   <div class="fg">
     <span class="fl">Facultad</span>
-    <select id="fFacultad" class="fs"><option value="">Todas</option></select>
+    <select id="fFacultad" class="fs" onchange="applyFilters()"><option value="">Todas</option></select>
   </div>
   <div class="fg">
     <span class="fl">Medio</span>
-    <select id="fMedio" class="fs">
+    <select id="fMedio" class="fs" onchange="applyFilters()">
       <option value="">Todos</option>
       <option value="Facebook">Facebook</option>
       <option value="Google">Google</option>
@@ -323,7 +323,7 @@ td:first-child{text-align:left;}
     <div class="medio-card">
       <div class="medio-icon mi-fb">FB</div>
       <div class="medio-body">
-        <div class="medio-name" style="color:var(--fb)">Facebook</div>
+        <div class="medio-name" style="color:#1877F2">Facebook</div>
         <div class="medio-stats">
           <div class="ms-item"><div class="ms-val" id="fb-inv">—</div><div class="ms-label">Inversión</div></div>
           <div class="ms-item"><div class="ms-val" id="fb-leads">—</div><div class="ms-label">Leads</div></div>
@@ -334,7 +334,7 @@ td:first-child{text-align:left;}
     <div class="medio-card">
       <div class="medio-icon mi-gg">GG</div>
       <div class="medio-body">
-        <div class="medio-name" style="color:var(--gg)">Google</div>
+        <div class="medio-name" style="color:#0B8043">Google</div>
         <div class="medio-stats">
           <div class="ms-item"><div class="ms-val" id="gg-inv">—</div><div class="ms-label">Inversión</div></div>
           <div class="ms-item"><div class="ms-val" id="gg-leads">—</div><div class="ms-label">Leads</div></div>
@@ -354,7 +354,9 @@ td:first-child{text-align:left;}
     <div class="chart-card">
       <div class="cc-title">Leads por Facultad y Ciudad</div>
       <div class="cc-sub">Todas las facultades agrupadas por ciudad</div>
-      <div class="cc-wrap tall"><canvas id="chartBarFacultad"></canvas></div>
+      <div style="overflow-y:auto;max-height:500px;">
+        <div class="cc-wrap tall" id="chartFacWrap"><canvas id="chartBarFacultad"></canvas></div>
+      </div>
     </div>
   </div>
 
@@ -444,6 +446,12 @@ async function loadData() {
     setLoad(70);
     rawResumen = parseResumen(rRes);
     rawMetas   = parseMetas(rMet);
+    console.log('[DATA] Resumen rows:', rawResumen.length, '| Metas rows:', rawMetas.length);
+    // Log unique ciudad+facultad+nivel combos in resumen vs metas
+    const resumCombos = new Set(rawResumen.map(r => r.nivel+'|'+r.ciudad+'|'+r.facultad));
+    const metasCombos = new Set(rawMetas.map(m => m.nivel+'|'+m.ciudad+'|'+m.facultad));
+    const matched = [...resumCombos].filter(c => metasCombos.has(c));
+    console.log('[MATCH] Resumen combos:', resumCombos.size, '| Metas combos:', metasCombos.size, '| Matched:', matched.length);
     setLoad(90);
     populateFilters();
     applyFilters();
@@ -506,15 +514,51 @@ function parseResumen(rows) {
   }).filter(r => r.medio && r.ciudad && r.facultad && r.nivel);
 }
 
+// TEMP DEBUG — remove after confirming
+const _origParseResumen = parseResumen;
+function parseResumen(rows) {
+  if (rows.length > 0) console.log('[RESUMEN cols]', Object.keys(rows[0]), '| sample row:', rows[0]);
+  return _origParseResumen(rows);
+}
+// END DEBUG
+}
+
 function parseMetas(rows) {
-  return rows.map(r => ({
-    ciudad: norm(r['Ciudad'] || ''),
-    facultad: (r['Facultad'] || '').trim(),
-    nivel: (r['Nivel'] || '').trim(),
-    presupuesto: parseNum(r['Presupuesto'] || 0),
-    metaLeads: parseNum(r['Leads'] || 0),
-    metaCPL: parseCPL(r['CPL'] || 0),
-  })).filter(r => r.ciudad && r.facultad && r.nivel);
+  // DEBUG: log first row keys so we can see exact column names
+  if (rows.length > 0) console.log('[METAS cols]', Object.keys(rows[0]));
+  const out = [];
+  rows.forEach(r => {
+    const ciudad = norm(r['Ciudad'] || '');
+    const facultad = (r['Facultad'] || '').trim();
+    const nivel = (r['Nivel'] || '').trim();
+    if (!ciudad || !facultad || !nivel) return;
+    // Presupuesto y CPL pueden venir con $, . como separador miles y , decimal (Colombia)
+    const presupuesto = parseCOPNum(r['Presupuesto'] || 0);
+    // Columna K = Leads (meta de leads, no matrículas)
+    const metaLeads = parseNum(r['Leads'] || 0);
+    const metaCPL = parseCOPNum(r['CPL'] || 0);
+    out.push({ ciudad, facultad, nivel, presupuesto, metaLeads, metaCPL });
+  });
+  console.log('[METAS parsed]', out.length, 'rows, sample:', out[0]);
+  return out;
+}
+
+// Parse Colombian number format: "$1.234.567" or "$15.149" -> number
+function parseCOPNum(v) {
+  if (!v && v !== 0) return 0;
+  let s = String(v).trim();
+  // Remove currency symbol and spaces
+  s = s.replace(/[$\s]/g, '');
+  // Colombian format: dots as thousands separators, comma as decimal
+  // e.g. "1.234.567" or "15.149" (could be 15149 or 15.149)
+  // If has comma -> decimal separator
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    // dots only: treat as thousands separator (no decimal part)
+    s = s.replace(/\./g, '');
+  }
+  return parseFloat(s) || 0;
 }
 
 function parseCPL(v) {
@@ -611,21 +655,35 @@ function aggregate(data) {
 }
 
 function getMeta(nivel, ciudad, facultad) {
-  // exact match
+  // Exact match only: ciudad + facultad + nivel
+  // Note: metas are stored with normalized ciudad (uppercase, no accents)
+  const nCiudad = norm(ciudad);
+  const nFacultad = facultad.trim();
+  const nNivel = nivel.trim();
+
+  // Try exact match
   const m = rawMetas.find(m =>
-    m.nivel === nivel &&
-    norm(m.ciudad) === norm(ciudad) &&
-    m.facultad === facultad
+    m.nivel === nNivel &&
+    m.ciudad === nCiudad &&
+    m.facultad === nFacultad
   );
-  if (m) return m;
-  // fallback: same nivel+facultad aggregated
-  const matches = rawMetas.filter(m => m.nivel === nivel && m.facultad === facultad);
-  if (matches.length) return {
-    presupuesto: matches.reduce((s,m) => s + m.presupuesto, 0),
-    metaLeads: matches.reduce((s,m) => s + m.metaLeads, 0),
-    metaCPL: matches.reduce((s,m) => s + m.metaCPL, 0) / matches.length,
-  };
-  return {presupuesto:0, metaLeads:0, metaCPL:0};
+  if (m) return { presupuesto: m.presupuesto, metaLeads: m.metaLeads, metaCPL: m.metaCPL };
+
+  // Fallback: match by nivel + facultad only (sum presupuesto + leads across cities)
+  // This is used when the same facultad exists in multiple cities but we only have
+  // aggregate metas. ONLY sum — don't multiply.
+  const matches = rawMetas.filter(m => m.nivel === nNivel && m.facultad === nFacultad);
+  if (matches.length) {
+    const totalPresup = matches.reduce((s,m) => s + m.presupuesto, 0);
+    const totalLeads  = matches.reduce((s,m) => s + m.metaLeads, 0);
+    const avgCPL      = matches.reduce((s,m) => s + m.metaCPL, 0) / matches.length;
+    // Prorate by city: if we have city match on presupuesto use it, else divide equally
+    const cityMatch = matches.find(m => m.ciudad === nCiudad);
+    if (cityMatch) return { presupuesto: cityMatch.presupuesto, metaLeads: cityMatch.metaLeads, metaCPL: cityMatch.metaCPL };
+    // No city match — return zeros to avoid inflated percentages
+    return { presupuesto: 0, metaLeads: 0, metaCPL: avgCPL };
+  }
+  return { presupuesto: 0, metaLeads: 0, metaCPL: 0 };
 }
 
 // ── KPIs ──
@@ -714,8 +772,8 @@ function renderLineChart() {
     data: {
       labels: days.map(d => d.slice(5)),
       datasets: [
-        { label: 'Facebook', data: days.map(d => byDay[d].fb), borderColor: '#4A9EFF', backgroundColor: 'rgba(74,158,255,.08)', tension: .3, pointRadius: 2, borderWidth: 2 },
-        { label: 'Google',   data: days.map(d => byDay[d].gg), borderColor: '#00D68F', backgroundColor: 'rgba(0,214,143,.08)', tension: .3, pointRadius: 2, borderWidth: 2 }
+        { label: 'Facebook', data: days.map(d => byDay[d].fb), borderColor: '#1877F2', backgroundColor: 'rgba(24,119,242,.08)', tension: .3, pointRadius: 2, borderWidth: 2 },
+        { label: 'Google',   data: days.map(d => byDay[d].gg), borderColor: '#0B8043', backgroundColor: 'rgba(11,128,67,.08)', tension: .3, pointRadius: 2, borderWidth: 2 }
       ]
     },
     options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: { label: ctx => ' ' + fmtCOP(ctx.raw) } } } }
@@ -724,16 +782,25 @@ function renderLineChart() {
 
 function renderBarFacultad() {
   destroyChart('barFac');
-  // leads by ciudad-facultad
   const map = {};
   filteredData.forEach(r => {
-    const k = r.ciudad + ' · ' + r.facultad;
-    if (!map[k]) map[k] = {ciudad: r.ciudad, facultad: r.facultad, leads: 0};
+    const k = r.ciudad + '|||' + r.facultad;
+    if (!map[k]) map[k] = {ciudad: r.ciudad, facultad: r.facultad, leads: 0, inv: 0};
     map[k].leads += r.leads;
+    map[k].inv += r.inv;
   });
   const sorted = Object.values(map).sort((a,b) => b.leads - a.leads);
-  const labels = sorted.map(s => s.ciudad.length > 10 ? s.ciudad.slice(0,8)+'…' : s.ciudad);
+  // Label: "Ciudad · Facultad" truncated for readability
+  const labels = sorted.map(s => {
+    const c = s.ciudad.length > 9 ? s.ciudad.slice(0,8)+'.' : s.ciudad;
+    const f = s.facultad.length > 18 ? s.facultad.slice(0,17)+'.' : s.facultad;
+    return c + ' · ' + f;
+  });
   const fullLabels = sorted.map(s => s.ciudad + ' · ' + s.facultad);
+
+  // Dynamic height: at least 300px, 18px per item
+  const chartH = Math.max(300, sorted.length * 18);
+  document.getElementById('chartBarFacultad').parentElement.style.height = chartH + 'px';
 
   const ctx = document.getElementById('chartBarFacultad').getContext('2d');
   charts.barFac = new Chart(ctx, {
@@ -743,23 +810,26 @@ function renderBarFacultad() {
       datasets: [{
         label: 'Leads',
         data: sorted.map(s => s.leads),
-        backgroundColor: sorted.map((_,i) => `hsl(${(i * 23) % 360},60%,55%)`),
-        borderRadius: 3,
+        backgroundColor: sorted.map((_,i) => `hsl(${(i * 31) % 360},55%,52%)`),
+        borderRadius: 2,
+        barThickness: 12,
       }]
     },
     options: {
       ...CHART_OPTS,
       indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: {
-          title: ctx2 => fullLabels[ctx2[0].dataIndex],
-          label: ctx2 => ' Leads: ' + fmtN(ctx2.raw)
+          title: (ctx2) => fullLabels[ctx2[0].dataIndex],
+          label: (ctx2) => [' Leads: ' + fmtN(ctx2.raw), ' Inv: ' + fmtCOP(sorted[ctx2[0].dataIndex].inv)]
         }}
       },
       scales: {
-        x: { ticks: { color: '#666', font: { family:'Poppins',size:9 } }, grid: { color:'#1A1A1A' } },
-        y: { ticks: { color: '#888', font: { family:'Poppins',size:8 } }, grid: { color:'#161616' } }
+        x: { ticks: { color: '#9CA3AF', font: { family:'Poppins', size:9 } }, grid: { color:'#EDEEF2' } },
+        y: { ticks: { color: '#6B7280', font: { family:'Poppins', size:8 }, autoSkip: false }, grid: { color:'#F0F1F4' } }
       }
     }
   });
@@ -780,8 +850,8 @@ function renderBarCiudad() {
     data: {
       labels: cities,
       datasets: [
-        { label:'Facebook', data: cities.map(c=>map[c].fb), backgroundColor:'rgba(74,158,255,.75)', borderRadius:3 },
-        { label:'Google',   data: cities.map(c=>map[c].gg), backgroundColor:'rgba(0,214,143,.75)', borderRadius:3 }
+        { label:'Facebook', data: cities.map(c=>map[c].fb), backgroundColor:'rgba(24,119,242,.75)', borderRadius:3 },
+        { label:'Google',   data: cities.map(c=>map[c].gg), backgroundColor:'rgba(11,128,67,.75)', borderRadius:3 }
       ]
     },
     options: {
@@ -951,6 +1021,7 @@ function buildRow(cls, label, fbL,ggL,totL,metaL,pCumpl, fbInv,ggInv,totInv,pres
 }
 
 function pill(v, hi, mid, label) {
+  if (!v || !isFinite(v)) return `<span class="tpill tn">—</span>`;
   const cls = v >= hi ? 'tg' : v >= mid ? 'ty' : 'tr';
   return `<span class="tpill ${cls}">${label}</span>`;
 }
@@ -1065,7 +1136,12 @@ function fmtCOP(v) {
   return '$' + Math.round(v).toLocaleString('es-CO');
 }
 function fmtN(v) { return Math.round(v).toLocaleString('es-CO'); }
-function fmtPct(v) { return (v*100).toFixed(1) + '%'; }
+function fmtPct(v) {
+  if (!v || isNaN(v)) return '0.0%';
+  const pct = v * 100;
+  if (pct > 999.9) return '>999%';
+  return pct.toFixed(1) + '%';
+}
 
 function showErr(msg) {
   const el = document.getElementById('errBanner');
