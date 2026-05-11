@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Pauta Digital — UAN</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #0A0A0A;
+  --surface: #111111;
+  --surface2: #181818;
+  --surface3: #1E1E1E;
+  --border: #242424;
+  --border2: #2E2E2E;
+  --accent: #FFC000;
+  --accent-dim: rgba(255,192,0,0.10);
+  --accent-glow: rgba(255,192,0,0.20);
+  --fb: #4A9EFF;
+  --fb-dim: rgba(74,158,255,0.10);
+  --gg: #00D68F;
+  --gg-dim: rgba(0,214,143,0.10);
+  --text: #EFEFEF;
+  --text2: #888;
+  --text3: #444;
+  --green: #00D68F;
+  --yellow: #FFC000;
+  --red: #FF4D4D;
+  --green-bg: rgba(0,214,143,0.10);
+  --yellow-bg: rgba(255,192,0,0.10);
+  --red-bg: rgba(255,77,77,0.10);
+  --radius: 10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+.load-logo{font-size:32px;font-weight:900;color:var(--accent);letter-spacing:3px;}
+.load-sub{font-size:12px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;}
+.load-bar-wrap{width:220px;height:2px;background:var(--surface2);border-radius:2px;overflow:hidden;}
+.load-bar{height:100%;background:var(--accent);width:0%;transition:width 0.4s ease;border-radius:2px;}
+
+/* ── HEADER ── */
+.header{
+  height:56px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;padding:0 24px;
+  position:sticky;top:0;z-index:100;
+}
+.logo-wrap{display:flex;align-items:center;gap:10px;}
+.logo-text{font-size:20px;font-weight:900;color:var(--accent);letter-spacing:2px;line-height:1;}
+.logo-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;}
+.header-pipe{width:1px;height:24px;background:var(--border2);}
+.header-title{font-size:12px;font-weight:500;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;}
+.header-spacer{flex:1;}
+.last-update{font-size:11px;color:var(--text3);}
+#statusDot{width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:4px;}
+#statusDot.ok{background:var(--green);box-shadow:0 0 6px var(--green);}
+#statusDot.err{background:var(--red);}
+.btn-refresh{
+  background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);
+  padding:5px 14px;border-radius:6px;font-size:11px;font-family:'Poppins',sans-serif;
+  cursor:pointer;font-weight:700;transition:all .2s;letter-spacing:.5px;
+}
+.btn-refresh:hover{background:var(--accent);color:#000;}
+
+/* ── FILTERS ── */
+.filters{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.fg{display:flex;align-items:center;gap:7px;}
+.fl{font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+.fs,.fi{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:5px 10px;border-radius:6px;font-size:11px;font-family:'Poppins',sans-serif;
+  outline:none;transition:border-color .2s;cursor:pointer;
+}
+.fs:focus,.fi:focus{border-color:var(--accent);}
+.fi{width:120px;}
+.fsep{width:1px;height:20px;background:var(--border2);}
+.btn-apply{
+  background:var(--accent);border:none;color:#000;
+  padding:6px 16px;border-radius:6px;font-size:11px;font-family:'Poppins',sans-serif;
+  cursor:pointer;font-weight:800;transition:opacity .2s;
+}
+.btn-apply:hover{opacity:.85;}
+.btn-clear{
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  padding:6px 12px;border-radius:6px;font-size:11px;font-family:'Poppins',sans-serif;
+  cursor:pointer;transition:all .2s;
+}
+.btn-clear:hover{border-color:var(--text2);color:var(--text);}
+
+/* ── MAIN ── */
+.main{padding:18px 24px 40px;}
+
+/* ── SECTION LABEL ── */
+.slabel{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+
+/* ── KPI GRID TOP ── */
+.kpi-top{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:10px;}
+.kpi-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 14px 12px;position:relative;overflow:hidden;transition:border-color .2s;
+}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi-card.c-accent::before{background:var(--accent);}
+.kpi-card.c-fb::before{background:var(--fb);}
+.kpi-card.c-gg::before{background:var(--gg);}
+.kpi-card.c-red::before{background:var(--red);}
+.kpi-card:hover{border-color:var(--border2);}
+.kc-label{font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.kc-val{font-size:22px;font-weight:800;line-height:1;color:var(--text);}
+.kc-val.sm{font-size:16px;}
+.kc-sub{font-size:10px;color:var(--text2);margin-top:3px;}
+.kc-pill{
+  display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;
+  font-size:10px;font-weight:700;margin-top:5px;
+}
+.pill-g{background:var(--green-bg);color:var(--green);}
+.pill-y{background:var(--yellow-bg);color:var(--yellow);}
+.pill-r{background:var(--red-bg);color:var(--red);}
+.pill-n{background:rgba(255,255,255,.05);color:var(--text2);}
+
+/* ── KPI MEDIO ── */
+.kpi-medio{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.medio-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;display:flex;gap:14px;align-items:flex-start;
+}
+.medio-icon{
+  width:38px;height:38px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;
+}
+.mi-fb{background:var(--fb-dim);color:var(--fb);}
+.mi-gg{background:var(--gg-dim);color:var(--gg);}
+.medio-body{flex:1;}
+.medio-name{font-size:13px;font-weight:700;margin-bottom:8px;}
+.medio-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ms-item{text-align:center;}
+.ms-val{font-size:14px;font-weight:700;}
+.ms-label{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;}
+
+/* ── CHARTS ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;
+}
+.cc-title{font-size:12px;font-weight:700;margin-bottom:2px;}
+.cc-sub{font-size:10px;color:var(--text2);margin-bottom:12px;}
+.cc-wrap{position:relative;height:230px;}
+.cc-wrap.tall{height:300px;}
+
+/* ── TABLE SECTION ── */
+.table-section{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
+}
+.th-bar{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.th-title{font-size:13px;font-weight:700;flex:1;}
+.view-tabs{display:flex;gap:4px;}
+.vtab{
+  padding:4px 11px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--text2);
+  font-family:'Poppins',sans-serif;transition:all .15s;text-transform:uppercase;letter-spacing:.3px;
+}
+.vtab.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);}
+.vtab:hover:not(.on){border-color:var(--text3);color:var(--text);}
+.expand-all{
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  padding:4px 11px;border-radius:5px;font-size:10px;font-family:'Poppins',sans-serif;
+  cursor:pointer;transition:all .15s;font-weight:600;
+}
+.expand-all:hover{border-color:var(--text3);color:var(--text);}
+.table-scroll{overflow-x:auto;max-height:520px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+thead{position:sticky;top:0;z-index:10;}
+thead th{
+  background:#0D0D0D;padding:9px 12px;text-align:right;
+  font-size:9px;font-weight:700;color:var(--text2);text-transform:uppercase;
+  letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap;
+  cursor:pointer;user-select:none;
+}
+thead th:first-child{text-align:left;min-width:230px;}
+thead th:hover{color:var(--accent);}
+thead th.sa::after{content:' ↑';color:var(--accent);}
+thead th.sd::after{content:' ↓';color:var(--accent);}
+tbody tr{border-bottom:1px solid #141414;transition:background .1s;}
+tbody tr:hover:not(.row-total){background:rgba(255,255,255,.018);}
+
+/* row nivel */
+.row-nivel{background:#161616 !important;}
+.row-nivel td{font-weight:700;font-size:12px;}
+.row-nivel td:first-child{padding-left:12px;}
+
+/* row ciudad */
+.row-ciudad{background:#131313 !important;}
+.row-ciudad td{font-weight:600;}
+.row-ciudad td:first-child{padding-left:30px;}
+
+/* row facultad */
+.row-facultad td:first-child{padding-left:52px;color:var(--text2);}
+
+/* row total */
+.row-total{background:var(--accent) !important;position:sticky;bottom:0;z-index:5;}
+.row-total td{color:#000 !important;font-weight:800;font-size:12px;}
+
+td{padding:8px 12px;text-align:right;color:var(--text);}
+td:first-child{text-align:left;}
+
+.ebtn{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:9px;margin-right:5px;width:12px;display:inline-block;
+  text-align:center;transition:transform .15s, color .15s;
+}
+.ebtn:hover{color:var(--accent);}
+.ebtn.open{transform:rotate(90deg);}
+
+.tpill{display:inline-flex;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap;}
+.tg{background:var(--green-bg);color:var(--green);}
+.ty{background:var(--yellow-bg);color:var(--yellow);}
+.tr{background:var(--red-bg);color:var(--red);}
+.tn{background:rgba(255,255,255,.05);color:var(--text2);}
+
+.hc{display:none !important;}
+.err-banner{background:var(--red-bg);border:1px solid var(--red);color:var(--red);padding:10px 16px;border-radius:8px;font-size:11px;margin-bottom:14px;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="load-logo">ADCOM</div>
+  <div class="load-sub">Cargando datos de pauta…</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-wrap">
+    <span class="logo-text">ADCOM</span>
+    <span class="logo-dot"></span>
+  </div>
+  <div class="header-pipe"></div>
+  <span class="header-title">Dashboard Pauta Digital — UAN</span>
+  <div class="header-spacer"></div>
+  <span class="last-update"><span id="statusDot"></span><span id="lastUpdate">—</span></span>
+  <button class="btn-refresh" onclick="loadData()">↺ Actualizar</button>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <div class="fg">
+    <span class="fl">Desde</span>
+    <input type="date" id="fDesde" class="fi">
+  </div>
+  <div class="fg">
+    <span class="fl">Hasta</span>
+    <input type="date" id="fHasta" class="fi">
+  </div>
+  <div class="fsep"></div>
+  <div class="fg">
+    <span class="fl">Nivel</span>
+    <select id="fNivel" class="fs">
+      <option value="">Todos</option>
+      <option value="Posgrado">Posgrado</option>
+      <option value="Pregrado">Pregrado</option>
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Ciudad</span>
+    <select id="fCiudad" class="fs"><option value="">Todas</option></select>
+  </div>
+  <div class="fg">
+    <span class="fl">Facultad</span>
+    <select id="fFacultad" class="fs"><option value="">Todas</option></select>
+  </div>
+  <div class="fg">
+    <span class="fl">Medio</span>
+    <select id="fMedio" class="fs">
+      <option value="">Todos</option>
+      <option value="Facebook">Facebook</option>
+      <option value="Google">Google</option>
+    </select>
+  </div>
+  <div class="fsep"></div>
+  <button class="btn-apply" onclick="applyFilters()">Aplicar</button>
+  <button class="btn-clear" onclick="clearFilters()">Limpiar</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div id="errBanner" style="display:none" class="err-banner"></div>
+
+  <!-- KPI TOP -->
+  <div class="slabel">Resumen General</div>
+  <div class="kpi-top" id="kpiTop">
+    <div class="kpi-card c-accent"><div class="kc-label">Inversión Total</div><div class="kc-val" id="k-inv">—</div><div class="kc-sub" id="k-inv-sub">—</div></div>
+    <div class="kpi-card c-accent"><div class="kc-label">Leads Totales</div><div class="kc-val" id="k-leads">—</div><div class="kc-sub" id="k-leads-sub">—</div></div>
+    <div class="kpi-card c-accent"><div class="kc-label">CPL Promedio</div><div class="kc-val" id="k-cpl">—</div><div class="kc-sub" id="k-cpl-sub">—</div></div>
+    <div class="kpi-card c-gg"><div class="kc-label">Meta Leads</div><div class="kc-val" id="k-meta">—</div><div class="kc-pill pill-n" id="k-meta-pill">—</div></div>
+    <div class="kpi-card c-gg"><div class="kc-label">% Cumpl. Leads</div><div class="kc-val" id="k-pcumpl">—</div><div class="kc-pill" id="k-pcumpl-pill">—</div></div>
+    <div class="kpi-card c-gg"><div class="kc-label">% Presup. Ejecutado</div><div class="kc-val" id="k-ppresup">—</div><div class="kc-pill" id="k-ppresup-pill">—</div></div>
+  </div>
+
+  <!-- KPI MEDIO -->
+  <div class="kpi-medio" id="kpiMedio">
+    <div class="medio-card">
+      <div class="medio-icon mi-fb">FB</div>
+      <div class="medio-body">
+        <div class="medio-name" style="color:var(--fb)">Facebook</div>
+        <div class="medio-stats">
+          <div class="ms-item"><div class="ms-val" id="fb-inv">—</div><div class="ms-label">Inversión</div></div>
+          <div class="ms-item"><div class="ms-val" id="fb-leads">—</div><div class="ms-label">Leads</div></div>
+          <div class="ms-item"><div class="ms-val" id="fb-cpl">—</div><div class="ms-label">CPL</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="medio-card">
+      <div class="medio-icon mi-gg">GG</div>
+      <div class="medio-body">
+        <div class="medio-name" style="color:var(--gg)">Google</div>
+        <div class="medio-stats">
+          <div class="ms-item"><div class="ms-val" id="gg-inv">—</div><div class="ms-label">Inversión</div></div>
+          <div class="ms-item"><div class="ms-val" id="gg-leads">—</div><div class="ms-label">Leads</div></div>
+          <div class="ms-item"><div class="ms-val" id="gg-cpl">—</div><div class="ms-label">CPL</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="cc-title">Inversión diaria por medio</div>
+      <div class="cc-sub">Facebook vs Google en el tiempo</div>
+      <div class="cc-wrap"><canvas id="chartLinea"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-title">Leads por Facultad y Ciudad</div>
+      <div class="cc-sub">Todas las facultades agrupadas por ciudad</div>
+      <div class="cc-wrap tall"><canvas id="chartBarFacultad"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-row" style="margin-bottom:18px;">
+    <div class="chart-card">
+      <div class="cc-title">Inversión por Ciudad</div>
+      <div class="cc-sub">Facebook + Google apilado</div>
+      <div class="cc-wrap"><canvas id="chartBarCiudad"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-title">Eficiencia: CPL vs % Cumplimiento</div>
+      <div class="cc-sub">Por facultad — burbujas más grandes = mayor inversión</div>
+      <div class="cc-wrap"><canvas id="chartScatter"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-section">
+    <div class="th-bar">
+      <span class="th-title">Tabla de Consumo</span>
+      <div class="view-tabs">
+        <button class="vtab on" onclick="setView('leads')">Leads</button>
+        <button class="vtab" onclick="setView('inversion')">Inversión</button>
+        <button class="vtab" onclick="setView('eficiencia')">Eficiencia</button>
+        <button class="vtab" onclick="setView('completa')">Completa</button>
+      </div>
+      <button class="expand-all" id="expandAllBtn" onclick="toggleAll()">Expandir todo</button>
+    </div>
+    <div class="table-scroll">
+      <table id="mainTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">Dimensión</th>
+            <!-- LEADS VIEW -->
+            <th class="v-leads" onclick="sortTable(1)">FB Leads</th>
+            <th class="v-leads" onclick="sortTable(2)">GG Leads</th>
+            <th class="v-leads v-completa" onclick="sortTable(3)">Total Leads</th>
+            <th class="v-leads v-completa" onclick="sortTable(4)">Meta Leads</th>
+            <th class="v-leads v-completa" onclick="sortTable(5)">% Cumpl.</th>
+            <!-- INVERSIÓN VIEW -->
+            <th class="v-inversion" onclick="sortTable(6)">FB Inversión</th>
+            <th class="v-inversion" onclick="sortTable(7)">GG Inversión</th>
+            <th class="v-inversion v-completa" onclick="sortTable(8)">Total Inv.</th>
+            <th class="v-inversion v-completa" onclick="sortTable(9)">Presupuesto</th>
+            <th class="v-inversion v-completa" onclick="sortTable(10)">% Ejecución</th>
+            <!-- EFICIENCIA VIEW -->
+            <th class="v-eficiencia" onclick="sortTable(11)">CPL FB</th>
+            <th class="v-eficiencia" onclick="sortTable(12)">CPL GG</th>
+            <th class="v-eficiencia v-completa" onclick="sortTable(13)">CPL Total</th>
+            <th class="v-eficiencia v-completa" onclick="sortTable(14)">CPL Meta</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot id="tableFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSmIOqiDYh8xvSsYly7-R54Ved2YTB9xubHiN2C0nWkNw1qhFv_TrbhYyD5ZREuTHnQtZEb5Vhznk8U/pub';
+const URL_RESUMEN = BASE + '?gid=1846504808&output=csv';
+const URL_METAS   = BASE + '?gid=577768057&output=csv';
+
+// ── STATE ──
+let rawResumen = [], rawMetas = [];
+let filteredData = [];
+let currentView = 'leads';
+let sortCol = -1, sortAsc = true;
+let expandedNivel = {}, expandedCiudad = {};
+let allExpanded = false;
+let charts = {};
+
+// ── INIT ──
+window.onload = () => loadData();
+
+async function loadData() {
+  setLoad(20);
+  document.getElementById('statusDot').className = '';
+  try {
+    const [rRes, rMet] = await Promise.all([
+      fetchCSV(URL_RESUMEN),
+      fetchCSV(URL_METAS)
+    ]);
+    setLoad(70);
+    rawResumen = parseResumen(rRes);
+    rawMetas   = parseMetas(rMet);
+    setLoad(90);
+    populateFilters();
+    applyFilters();
+    document.getElementById('lastUpdate').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-CO');
+    document.getElementById('statusDot').className = 'ok';
+    setLoad(100);
+    setTimeout(() => document.getElementById('loading').style.display = 'none', 400);
+  } catch(e) {
+    document.getElementById('statusDot').className = 'err';
+    showErr('Error al cargar datos: ' + e.message + '. Verifica que el Sheets esté publicado.');
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+function setLoad(p) { document.getElementById('loadBar').style.width = p + '%'; }
+
+function fetchCSV(url) {
+  return new Promise((res, rej) => {
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: r => res(r.data),
+      error: e => rej(e)
+    });
+  });
+}
+
+// ── PARSE ──
+function parseResumen(rows) {
+  return rows.map(r => {
+    const dateRaw = r['Date'] || r['date'] || '';
+    let dateObj = null;
+    if (dateRaw) {
+      // Excel serial or date string
+      const num = Number(dateRaw);
+      if (!isNaN(num) && num > 40000) {
+        dateObj = new Date((num - 25569) * 86400 * 1000);
+      } else {
+        dateObj = new Date(dateRaw);
+      }
+    }
+    return {
+      date: dateObj,
+      dateStr: dateObj ? dateObj.toISOString().split('T')[0] : '',
+      medio: (r['Medio'] || r['medio'] || '').trim(),
+      ciudad: norm(r['Ciudad'] || r['ciudad'] || ''),
+      facultad: (r['Facultad'] || r['facultad'] || '').trim(),
+      nivel: (r['Nivel'] || r['nivel'] || '').trim(),
+      inv: parseNum(r['Amount Spent'] || r['amount_spent'] || r['Inversión'] || 0),
+      leads: parseNum(r['Registrations Completed'] || r['leads'] || r['Leads'] || 0),
+    };
+  }).filter(r => r.medio && r.ciudad && r.facultad && r.nivel);
+}
+
+function parseMetas(rows) {
+  return rows.map(r => ({
+    ciudad: norm(r['Ciudad'] || ''),
+    facultad: (r['Facultad'] || '').trim(),
+    nivel: (r['Nivel'] || '').trim(),
+    presupuesto: parseNum(r['Presupuesto'] || 0),
+    metaLeads: parseNum(r['Leads'] || 0),
+    metaCPL: parseCPL(r['CPL'] || 0),
+  })).filter(r => r.ciudad && r.facultad && r.nivel);
+}
+
+function parseCPL(v) {
+  if (typeof v === 'string') v = v.replace(/[$,\s]/g, '');
+  return parseFloat(v) || 0;
+}
+function parseNum(v) { return parseFloat(String(v).replace(/[$,\s]/g,'')) || 0; }
+function norm(s) { return String(s).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+// ── FILTERS POPULATE ──
+function populateFilters() {
+  const ciudades = [...new Set(rawResumen.map(r => r.ciudad))].sort();
+  const facultades = [...new Set(rawResumen.map(r => r.facultad))].sort();
+  fillSelect('fCiudad', ciudades);
+  fillSelect('fFacultad', facultades);
+
+  // date range
+  const dates = rawResumen.map(r => r.dateStr).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('fDesde').value = dates[0];
+    document.getElementById('fHasta').value = dates[dates.length - 1];
+  }
+}
+
+function fillSelect(id, opts) {
+  const sel = document.getElementById(id);
+  const cur = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  opts.forEach(o => { const op = new Option(o, o); sel.add(op); });
+  if (cur) sel.value = cur;
+}
+
+// ── APPLY FILTERS ──
+function applyFilters() {
+  const desde   = document.getElementById('fDesde').value;
+  const hasta   = document.getElementById('fHasta').value;
+  const nivel   = document.getElementById('fNivel').value;
+  const ciudad  = document.getElementById('fCiudad').value;
+  const facultad = document.getElementById('fFacultad').value;
+  const medio   = document.getElementById('fMedio').value;
+
+  filteredData = rawResumen.filter(r => {
+    if (desde && r.dateStr < desde) return false;
+    if (hasta && r.dateStr > hasta) return false;
+    if (nivel && r.nivel !== nivel) return false;
+    if (ciudad && r.ciudad !== norm(ciudad)) return false;
+    if (facultad && r.facultad !== facultad) return false;
+    if (medio && r.medio !== medio) return false;
+    return true;
+  });
+
+  renderKPIs();
+  renderCharts();
+  renderTable();
+}
+
+function clearFilters() {
+  const dates = rawResumen.map(r => r.dateStr).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('fDesde').value = dates[0];
+    document.getElementById('fHasta').value = dates[dates.length - 1];
+  }
+  ['fNivel','fCiudad','fFacultad','fMedio'].forEach(id => document.getElementById(id).value = '');
+  applyFilters();
+}
+
+// ── AGGREGATE ──
+function aggregate(data) {
+  // group by nivel+ciudad+facultad
+  const map = {};
+  data.forEach(r => {
+    const key = `${r.nivel}|||${r.ciudad}|||${r.facultad}`;
+    if (!map[key]) map[key] = {nivel:r.nivel, ciudad:r.ciudad, facultad:r.facultad, fbInv:0, ggInv:0, fbLeads:0, ggLeads:0};
+    if (r.medio === 'Facebook') { map[key].fbInv += r.inv; map[key].fbLeads += r.leads; }
+    else if (r.medio === 'Google') { map[key].ggInv += r.inv; map[key].ggLeads += r.leads; }
+  });
+  return Object.values(map).map(row => {
+    const meta = getMeta(row.nivel, row.ciudad, row.facultad);
+    const totalInv = row.fbInv + row.ggInv;
+    const totalLeads = row.fbLeads + row.ggLeads;
+    return {
+      ...row,
+      totalInv, totalLeads,
+      presupuesto: meta.presupuesto,
+      metaLeads: meta.metaLeads,
+      metaCPL: meta.metaCPL,
+      pEjecucion: meta.presupuesto ? totalInv / meta.presupuesto : 0,
+      pCumplLeads: meta.metaLeads ? totalLeads / meta.metaLeads : 0,
+      cplFb: row.fbLeads ? row.fbInv / row.fbLeads : 0,
+      cplGg: row.ggLeads ? row.ggInv / row.ggLeads : 0,
+      cplTotal: totalLeads ? totalInv / totalLeads : 0,
+    };
+  });
+}
+
+function getMeta(nivel, ciudad, facultad) {
+  // exact match
+  const m = rawMetas.find(m =>
+    m.nivel === nivel &&
+    norm(m.ciudad) === norm(ciudad) &&
+    m.facultad === facultad
+  );
+  if (m) return m;
+  // fallback: same nivel+facultad aggregated
+  const matches = rawMetas.filter(m => m.nivel === nivel && m.facultad === facultad);
+  if (matches.length) return {
+    presupuesto: matches.reduce((s,m) => s + m.presupuesto, 0),
+    metaLeads: matches.reduce((s,m) => s + m.metaLeads, 0),
+    metaCPL: matches.reduce((s,m) => s + m.metaCPL, 0) / matches.length,
+  };
+  return {presupuesto:0, metaLeads:0, metaCPL:0};
+}
+
+// ── KPIs ──
+function renderKPIs() {
+  const fb = filteredData.filter(r => r.medio === 'Facebook');
+  const gg = filteredData.filter(r => r.medio === 'Google');
+
+  const totalInv   = filteredData.reduce((s,r) => s + r.inv, 0);
+  const totalLeads = filteredData.reduce((s,r) => s + r.leads, 0);
+  const fbInv      = fb.reduce((s,r) => s + r.inv, 0);
+  const fbLeads    = fb.reduce((s,r) => s + r.leads, 0);
+  const ggInv      = gg.reduce((s,r) => s + r.inv, 0);
+  const ggLeads    = gg.reduce((s,r) => s + r.leads, 0);
+  const cpl        = totalLeads ? totalInv / totalLeads : 0;
+
+  // metas totales (suma de todas las que apliquen)
+  const agg = aggregate(filteredData);
+  const metaLeadsTotal = agg.reduce((s,r) => s + r.metaLeads, 0);
+  const presupTotal    = agg.reduce((s,r) => s + r.presupuesto, 0);
+  const pCumpl = metaLeadsTotal ? totalLeads / metaLeadsTotal : 0;
+  const pPresup = presupTotal ? totalInv / presupTotal : 0;
+
+  set('k-inv', fmtCOP(totalInv));
+  set('k-inv-sub', `FB: ${fmtCOP(fbInv)} · GG: ${fmtCOP(ggInv)}`);
+  set('k-leads', fmtN(totalLeads));
+  set('k-leads-sub', `FB: ${fmtN(fbLeads)} · GG: ${fmtN(ggLeads)}`);
+  set('k-cpl', fmtCOP(cpl));
+  set('k-cpl-sub', `FB: ${fmtCOP(fbLeads?fbInv/fbLeads:0)} · GG: ${fmtCOP(ggLeads?ggInv/ggLeads:0)}`);
+  set('k-meta', fmtN(metaLeadsTotal));
+  setPill('k-meta-pill', `Meta total`, 'n');
+  set('k-pcumpl', fmtPct(pCumpl));
+  setPill('k-pcumpl-pill', pCumpl >= .8 ? '✓ On track' : pCumpl >= .5 ? '⚠ En riesgo' : '✗ Crítico', pillClass(pCumpl, .8, .5));
+  set('k-ppresup', fmtPct(pPresup));
+  setPill('k-ppresup-pill', pPresup >= .8 ? '✓ On track' : pPresup >= .5 ? '⚠ En riesgo' : '✗ Bajo', pillClass(pPresup, .8, .5));
+
+  set('fb-inv', fmtCOP(fbInv));
+  set('fb-leads', fmtN(fbLeads));
+  set('fb-cpl', fmtCOP(fbLeads ? fbInv/fbLeads : 0));
+  set('gg-inv', fmtCOP(ggInv));
+  set('gg-leads', fmtN(ggLeads));
+  set('gg-cpl', fmtCOP(ggLeads ? ggInv/ggLeads : 0));
+}
+
+function set(id, v) { const el = document.getElementById(id); if(el) el.textContent = v; }
+function setPill(id, txt, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = txt;
+  el.className = 'kc-pill pill-' + cls;
+}
+function pillClass(v, hi, mid) { return v >= hi ? 'g' : v >= mid ? 'y' : 'r'; }
+
+// ── CHARTS ──
+function renderCharts() {
+  renderLineChart();
+  renderBarFacultad();
+  renderBarCiudad();
+  renderScatter();
+}
+
+const CHART_OPTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#888', font: { family: 'Poppins', size: 10 }, boxWidth: 10 } } },
+  scales: {
+    x: { ticks: { color: '#666', font: { family: 'Poppins', size: 9 } }, grid: { color: '#1A1A1A' } },
+    y: { ticks: { color: '#666', font: { family: 'Poppins', size: 9 } }, grid: { color: '#1A1A1A' } }
+  }
+};
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderLineChart() {
+  destroyChart('linea');
+  // daily by medio
+  const byDay = {};
+  filteredData.forEach(r => {
+    if (!r.dateStr) return;
+    if (!byDay[r.dateStr]) byDay[r.dateStr] = {fb:0, gg:0};
+    if (r.medio === 'Facebook') byDay[r.dateStr].fb += r.inv;
+    else if (r.medio === 'Google') byDay[r.dateStr].gg += r.inv;
+  });
+  const days = Object.keys(byDay).sort();
+  const ctx = document.getElementById('chartLinea').getContext('2d');
+  charts.linea = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: days.map(d => d.slice(5)),
+      datasets: [
+        { label: 'Facebook', data: days.map(d => byDay[d].fb), borderColor: '#4A9EFF', backgroundColor: 'rgba(74,158,255,.08)', tension: .3, pointRadius: 2, borderWidth: 2 },
+        { label: 'Google',   data: days.map(d => byDay[d].gg), borderColor: '#00D68F', backgroundColor: 'rgba(0,214,143,.08)', tension: .3, pointRadius: 2, borderWidth: 2 }
+      ]
+    },
+    options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: { label: ctx => ' ' + fmtCOP(ctx.raw) } } } }
+  });
+}
+
+function renderBarFacultad() {
+  destroyChart('barFac');
+  // leads by ciudad-facultad
+  const map = {};
+  filteredData.forEach(r => {
+    const k = r.ciudad + ' · ' + r.facultad;
+    if (!map[k]) map[k] = {ciudad: r.ciudad, facultad: r.facultad, leads: 0};
+    map[k].leads += r.leads;
+  });
+  const sorted = Object.values(map).sort((a,b) => b.leads - a.leads);
+  const labels = sorted.map(s => s.ciudad.length > 10 ? s.ciudad.slice(0,8)+'…' : s.ciudad);
+  const fullLabels = sorted.map(s => s.ciudad + ' · ' + s.facultad);
+
+  const ctx = document.getElementById('chartBarFacultad').getContext('2d');
+  charts.barFac = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Leads',
+        data: sorted.map(s => s.leads),
+        backgroundColor: sorted.map((_,i) => `hsl(${(i * 23) % 360},60%,55%)`),
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      ...CHART_OPTS,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title: ctx2 => fullLabels[ctx2[0].dataIndex],
+          label: ctx2 => ' Leads: ' + fmtN(ctx2.raw)
+        }}
+      },
+      scales: {
+        x: { ticks: { color: '#666', font: { family:'Poppins',size:9 } }, grid: { color:'#1A1A1A' } },
+        y: { ticks: { color: '#888', font: { family:'Poppins',size:8 } }, grid: { color:'#161616' } }
+      }
+    }
+  });
+}
+
+function renderBarCiudad() {
+  destroyChart('barCiu');
+  const map = {};
+  filteredData.forEach(r => {
+    if (!map[r.ciudad]) map[r.ciudad] = {fb:0, gg:0};
+    if (r.medio === 'Facebook') map[r.ciudad].fb += r.inv;
+    else if (r.medio === 'Google') map[r.ciudad].gg += r.inv;
+  });
+  const cities = Object.keys(map).sort((a,b) => (map[b].fb+map[b].gg) - (map[a].fb+map[a].gg));
+  const ctx = document.getElementById('chartBarCiudad').getContext('2d');
+  charts.barCiu = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: cities,
+      datasets: [
+        { label:'Facebook', data: cities.map(c=>map[c].fb), backgroundColor:'rgba(74,158,255,.75)', borderRadius:3 },
+        { label:'Google',   data: cities.map(c=>map[c].gg), backgroundColor:'rgba(0,214,143,.75)', borderRadius:3 }
+      ]
+    },
+    options: {
+      ...CHART_OPTS,
+      scales: {
+        x: { stacked:true, ticks:{color:'#666',font:{family:'Poppins',size:8}}, grid:{color:'#1A1A1A'} },
+        y: { stacked:true, ticks:{color:'#666',font:{family:'Poppins',size:9}}, grid:{color:'#1A1A1A'} }
+      },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: { label: c => ' '+fmtCOP(c.raw) } } }
+    }
+  });
+}
+
+function renderScatter() {
+  destroyChart('scatter');
+  const agg = aggregate(filteredData);
+  const points = agg.filter(r => r.cplTotal && r.metaLeads).map(r => ({
+    x: r.cplTotal,
+    y: r.pCumplLeads * 100,
+    r: Math.max(3, Math.min(18, Math.sqrt(r.totalInv / 10000))),
+    label: r.facultad + ' (' + r.ciudad + ')'
+  }));
+  const ctx = document.getElementById('chartScatter').getContext('2d');
+  charts.scatter = new Chart(ctx, {
+    type: 'bubble',
+    data: { datasets: [{ label:'Facultades', data:points, backgroundColor:'rgba(255,192,0,.45)', borderColor:'rgba(255,192,0,.8)', borderWidth:1 }] },
+    options: {
+      ...CHART_OPTS,
+      plugins: {
+        legend:{display:false},
+        tooltip:{ callbacks:{ label: c => c.raw.label + ` | CPL: ${fmtCOP(c.raw.x)} | Cumpl: ${fmtPct(c.raw.y/100)}` } }
+      },
+      scales: {
+        x: { title:{display:true, text:'CPL', color:'#555', font:{family:'Poppins',size:9}}, ticks:{color:'#666',font:{family:'Poppins',size:9}}, grid:{color:'#1A1A1A'} },
+        y: { title:{display:true, text:'% Cumplimiento', color:'#555', font:{family:'Poppins',size:9}}, ticks:{color:'#666',font:{family:'Poppins',size:9},callback:v=>v+'%'}, grid:{color:'#1A1A1A'} }
+      }
+    }
+  });
+}
+
+// ── TABLE ──
+function renderTable() {
+  const agg = aggregate(filteredData);
+
+  // build hierarchy: nivel > ciudad > [facultades]
+  const tree = {};
+  agg.forEach(row => {
+    if (!tree[row.nivel]) tree[row.nivel] = {};
+    if (!tree[row.nivel][row.ciudad]) tree[row.nivel][row.ciudad] = [];
+    tree[row.nivel][row.ciudad].push(row);
+  });
+
+  const tbody = document.getElementById('tableBody');
+  const tfoot = document.getElementById('tableFoot');
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  // total general
+  const totInv = agg.reduce((s,r)=>s+r.totalInv,0);
+  const totLeads = agg.reduce((s,r)=>s+r.totalLeads,0);
+  const totFbInv = agg.reduce((s,r)=>s+r.fbInv,0);
+  const totFbL = agg.reduce((s,r)=>s+r.fbLeads,0);
+  const totGgInv = agg.reduce((s,r)=>s+r.ggInv,0);
+  const totGgL = agg.reduce((s,r)=>s+r.ggLeads,0);
+  const totMeta = agg.reduce((s,r)=>s+r.metaLeads,0);
+  const totPresup = agg.reduce((s,r)=>s+r.presupuesto,0);
+  const totPCumpl = totMeta ? totLeads/totMeta : 0;
+  const totPPresup = totPresup ? totInv/totPresup : 0;
+  const totCPL = totLeads ? totInv/totLeads : 0;
+
+  Object.keys(tree).sort().forEach(nivel => {
+    // nivel row
+    const nivelRows = Object.values(tree[nivel]).flat();
+    const nInv = nivelRows.reduce((s,r)=>s+r.totalInv,0);
+    const nLeads = nivelRows.reduce((s,r)=>s+r.totalLeads,0);
+    const nFbInv = nivelRows.reduce((s,r)=>s+r.fbInv,0);
+    const nFbL = nivelRows.reduce((s,r)=>s+r.fbLeads,0);
+    const nGgInv = nivelRows.reduce((s,r)=>s+r.ggInv,0);
+    const nGgL = nivelRows.reduce((s,r)=>s+r.ggLeads,0);
+    const nMeta = nivelRows.reduce((s,r)=>s+r.metaLeads,0);
+    const nPresup = nivelRows.reduce((s,r)=>s+r.presupuesto,0);
+    const nPCumpl = nMeta ? nLeads/nMeta : 0;
+    const nPPresup = nPresup ? nInv/nPresup : 0;
+    const nCPL = nLeads ? nInv/nLeads : 0;
+    const nCPLMeta = nivelRows.length ? nivelRows.reduce((s,r)=>s+r.metaCPL,0)/nivelRows.length : 0;
+
+    const nKey = nivel;
+    if (expandedNivel[nKey] === undefined) expandedNivel[nKey] = false;
+
+    tbody.innerHTML += buildRow('row-nivel', `<button class="ebtn ${expandedNivel[nKey]?'open':''}" onclick="toggleNivel('${escKey(nKey)}',this)">▶</button>${nivel}`,
+      nFbL, nGgL, nLeads, nMeta, nPCumpl,
+      nFbInv, nGgInv, nInv, nPresup, nPPresup,
+      nLeads?nFbInv/nFbL:0, nGgL?nGgInv/nGgL:0, nCPL, nCPLMeta,
+      `data-nivel="${escKey(nKey)}"`);
+
+    Object.keys(tree[nivel]).sort().forEach(ciudad => {
+      const cRows = tree[nivel][ciudad];
+      const cInv = cRows.reduce((s,r)=>s+r.totalInv,0);
+      const cLeads = cRows.reduce((s,r)=>s+r.totalLeads,0);
+      const cFbInv = cRows.reduce((s,r)=>s+r.fbInv,0);
+      const cFbL = cRows.reduce((s,r)=>s+r.fbLeads,0);
+      const cGgInv = cRows.reduce((s,r)=>s+r.ggInv,0);
+      const cGgL = cRows.reduce((s,r)=>s+r.ggLeads,0);
+      const cMeta = cRows.reduce((s,r)=>s+r.metaLeads,0);
+      const cPresup = cRows.reduce((s,r)=>s+r.presupuesto,0);
+      const cPCumpl = cMeta ? cLeads/cMeta : 0;
+      const cPPresup = cPresup ? cInv/cPresup : 0;
+      const cCPL = cLeads ? cInv/cLeads : 0;
+      const cCPLMeta = cRows.length ? cRows.reduce((s,r)=>s+r.metaCPL,0)/cRows.length : 0;
+
+      const cKey = nKey + '|||' + ciudad;
+      if (expandedCiudad[cKey] === undefined) expandedCiudad[cKey] = false;
+      const hidden = !expandedNivel[nKey];
+
+      tbody.innerHTML += buildRow('row-ciudad',
+        `<button class="ebtn ${expandedCiudad[cKey]?'open':''}" onclick="toggleCiudad('${escKey(cKey)}',this)">▶</button>${ciudad}`,
+        cFbL, cGgL, cLeads, cMeta, cPCumpl,
+        cFbInv, cGgInv, cInv, cPresup, cPPresup,
+        cFbL?cFbInv/cFbL:0, cGgL?cGgInv/cGgL:0, cCPL, cCPLMeta,
+        `data-ciudad="${escKey(cKey)}" data-nivel="${escKey(nKey)}" ${hidden?'style="display:none"':''}`);
+
+      cRows.sort((a,b)=>b.totalLeads-a.totalLeads).forEach(row => {
+        const hiddenF = hidden || !expandedCiudad[cKey];
+        tbody.innerHTML += buildRow('row-facultad', row.facultad,
+          row.fbLeads, row.ggLeads, row.totalLeads, row.metaLeads, row.pCumplLeads,
+          row.fbInv, row.ggInv, row.totalInv, row.presupuesto, row.pEjecucion,
+          row.cplFb, row.cplGg, row.cplTotal, row.metaCPL,
+          `data-fac="${escKey(cKey)}" data-nivel="${escKey(nKey)}" ${hiddenF?'style="display:none"':''}`);
+      });
+    });
+  });
+
+  // total row in tfoot
+  tfoot.innerHTML = buildRow('row-total', 'TOTAL GENERAL',
+    totFbL, totGgL, totLeads, totMeta, totPCumpl,
+    totFbInv, totGgInv, totInv, totPresup, totPPresup,
+    totFbL?totFbInv/totFbL:0, totGgL?totGgInv/totGgL:0, totCPL, 0, '');
+
+  applyView(currentView);
+}
+
+function buildRow(cls, label, fbL,ggL,totL,metaL,pCumpl, fbInv,ggInv,totInv,presup,pPresup, cplFb,cplGg,cplTot,cplMeta, attrs='') {
+  const isTotal = cls === 'row-total';
+  const cumplPill = isTotal ? fmtPct(pCumpl) : pill(pCumpl, .8, .5, fmtPct(pCumpl));
+  const presupPill = isTotal ? fmtPct(pPresup) : pill(pPresup, .8, .5, fmtPct(pPresup));
+  const cplPill = isTotal || !cplMeta ? fmtCOP(cplTot) : cplPillFn(cplTot, cplMeta);
+  const cplFbPill = isTotal || !cplMeta ? fmtCOP(cplFb) : cplPillFn(cplFb, cplMeta);
+  const cplGgPill = isTotal || !cplMeta ? fmtCOP(cplGg) : cplPillFn(cplGg, cplMeta);
+
+  return `<tr class="${cls}" ${attrs}>
+    <td>${label}</td>
+    <td class="v-leads">${fmtN(fbL)}</td>
+    <td class="v-leads">${fmtN(ggL)}</td>
+    <td class="v-leads v-completa">${fmtN(totL)}</td>
+    <td class="v-leads v-completa">${fmtN(metaL)}</td>
+    <td class="v-leads v-completa">${cumplPill}</td>
+    <td class="v-inversion">${fmtCOP(fbInv)}</td>
+    <td class="v-inversion">${fmtCOP(ggInv)}</td>
+    <td class="v-inversion v-completa">${fmtCOP(totInv)}</td>
+    <td class="v-inversion v-completa">${fmtCOP(presup)}</td>
+    <td class="v-inversion v-completa">${presupPill}</td>
+    <td class="v-eficiencia">${cplFbPill}</td>
+    <td class="v-eficiencia">${cplGgPill}</td>
+    <td class="v-eficiencia v-completa">${cplPill}</td>
+    <td class="v-eficiencia v-completa">${cplMeta ? fmtCOP(cplMeta) : '—'}</td>
+  </tr>`;
+}
+
+function pill(v, hi, mid, label) {
+  const cls = v >= hi ? 'tg' : v >= mid ? 'ty' : 'tr';
+  return `<span class="tpill ${cls}">${label}</span>`;
+}
+function cplPillFn(cpl, meta) {
+  if (!cpl || !meta) return fmtCOP(cpl);
+  const cls = cpl <= meta ? 'tg' : cpl <= meta * 1.3 ? 'ty' : 'tr';
+  return `<span class="tpill ${cls}">${fmtCOP(cpl)}</span>`;
+}
+
+// ── EXPAND / COLLAPSE ──
+function toggleNivel(key, btn) {
+  expandedNivel[key] = !expandedNivel[key];
+  btn.classList.toggle('open', expandedNivel[key]);
+  document.querySelectorAll(`[data-nivel="${key}"]`).forEach(row => {
+    if (row.classList.contains('row-ciudad')) {
+      row.style.display = expandedNivel[key] ? '' : 'none';
+      if (!expandedNivel[key]) {
+        const cKey = row.dataset.ciudad;
+        expandedCiudad[cKey] = false;
+        const cbtn = row.querySelector('.ebtn');
+        if (cbtn) cbtn.classList.remove('open');
+        document.querySelectorAll(`[data-fac="${cKey}"]`).forEach(f => f.style.display = 'none');
+      }
+    }
+  });
+}
+
+function toggleCiudad(key, btn) {
+  expandedCiudad[key] = !expandedCiudad[key];
+  btn.classList.toggle('open', expandedCiudad[key]);
+  document.querySelectorAll(`[data-fac="${key}"]`).forEach(row => {
+    row.style.display = expandedCiudad[key] ? '' : 'none';
+  });
+}
+
+function toggleAll() {
+  allExpanded = !allExpanded;
+  document.getElementById('expandAllBtn').textContent = allExpanded ? 'Colapsar todo' : 'Expandir todo';
+
+  Object.keys(expandedNivel).forEach(k => expandedNivel[k] = allExpanded);
+  Object.keys(expandedCiudad).forEach(k => expandedCiudad[k] = allExpanded);
+
+  document.querySelectorAll('.row-ciudad, .row-facultad').forEach(r => {
+    r.style.display = allExpanded ? '' : 'none';
+  });
+  document.querySelectorAll('.ebtn').forEach(b => b.classList.toggle('open', allExpanded));
+}
+
+function escKey(s) { return s.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ── VIEW TABS ──
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.vtab').forEach(b => b.classList.remove('on'));
+  event.target.classList.add('on');
+  applyView(v);
+}
+
+function applyView(v) {
+  const views = ['leads','inversion','eficiencia','completa'];
+  views.forEach(vv => {
+    document.querySelectorAll('.v-' + vv).forEach(el => {
+      if (v === 'completa') {
+        el.classList.remove('hc');
+      } else if (vv === v) {
+        el.classList.remove('hc');
+      } else if (vv !== 'completa') {
+        // hide columns that don't belong to this view AND are not in completa
+        const isCompleta = el.classList.contains('v-completa');
+        el.classList.toggle('hc', !isCompleta || v !== 'completa');
+      }
+    });
+  });
+
+  // for non-completa views: show only the primary view + completa shared cols
+  if (v !== 'completa') {
+    ['leads','inversion','eficiencia'].forEach(vv => {
+      document.querySelectorAll('.v-' + vv).forEach(el => {
+        const belongsToView = el.classList.contains('v-' + v);
+        el.classList.toggle('hc', !belongsToView);
+      });
+    });
+  } else {
+    document.querySelectorAll('[class*="v-"]').forEach(el => el.classList.remove('hc'));
+  }
+}
+
+// ── SORT ──
+function sortTable(col) {
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
+  rows.sort((a,b) => {
+    const av = getCellVal(a, col), bv = getCellVal(b, col);
+    return sortAsc ? av - bv : bv - av;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  document.querySelectorAll('thead th').forEach((th, i) => {
+    th.classList.remove('sa','sd');
+    if (i === col) th.classList.add(sortAsc ? 'sa' : 'sd');
+  });
+}
+function getCellVal(row, col) {
+  const cells = row.querySelectorAll('td');
+  if (!cells[col]) return 0;
+  return parseFloat(cells[col].textContent.replace(/[$%,.]/g,'')) || 0;
+}
+
+// ── FORMAT ──
+function fmtCOP(v) {
+  if (!v) return '$0';
+  return '$' + Math.round(v).toLocaleString('es-CO');
+}
+function fmtN(v) { return Math.round(v).toLocaleString('es-CO'); }
+function fmtPct(v) { return (v*100).toFixed(1) + '%'; }
+
+function showErr(msg) {
+  const el = document.getElementById('errBanner');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>
