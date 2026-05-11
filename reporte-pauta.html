@@ -460,24 +460,32 @@ async function loadData() {
     setLoad(100);
     setTimeout(() => document.getElementById('loading').style.display = 'none', 400);
   } catch(e) {
+    console.error('[loadData error]', e);
     document.getElementById('statusDot').className = 'err';
-    showErr('Error al cargar datos: ' + e.message + '. Verifica que el Sheets esté publicado.');
     document.getElementById('loading').style.display = 'none';
+    showErr('⚠ Error al cargar datos: ' + e.message + ' — Abre F12 > Console para más detalles. Verifica que el Sheets esté publicado en Archivo → Compartir → Publicar en la web → CSV.');
   }
 }
 
 function setLoad(p) { document.getElementById('loadBar').style.width = p + '%'; }
 
-function fetchCSV(url) {
-  return new Promise((res, rej) => {
-    Papa.parse(url, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: r => res(r.data),
-      error: e => rej(e)
-    });
-  });
+async function fetchCSV(url) {
+  // Use fetch() directly — more reliable than PapaParse download:true with Sheets redirects
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+    if (result.errors.length) console.warn('[CSV errors]', result.errors.slice(0,3));
+    return result.data;
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('Timeout al cargar — verifica que el Sheets esté publicado como CSV público.');
+    throw e;
+  }
 }
 
 // ── PARSE ──
@@ -502,6 +510,7 @@ function parseResumen(rows) {
         if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
       }
     }
+    if (rows.indexOf(r) === 0) console.log('[RESUMEN cols]', Object.keys(r));
     return {
       dateStr,
       medio: (r['Medio'] || r['medio'] || '').trim(),
@@ -514,13 +523,8 @@ function parseResumen(rows) {
   }).filter(r => r.medio && r.ciudad && r.facultad && r.nivel);
 }
 
-// TEMP DEBUG — remove after confirming
-const _origParseResumen = parseResumen;
-function parseResumen(rows) {
-  if (rows.length > 0) console.log('[RESUMEN cols]', Object.keys(rows[0]), '| sample row:', rows[0]);
-  return _origParseResumen(rows);
-}
-// END DEBUG
+// DEBUG — logs column names on first load
+// (safe to leave in — just opens F12 to see)
 }
 
 function parseMetas(rows) {
