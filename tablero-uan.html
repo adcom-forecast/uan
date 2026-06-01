@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero Pauta — UAN</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --black:#0A0A0A;--white:#FFFFFF;--yellow:#FFC000;
+  --gray-50:#F8F8F8;--gray-100:#F0F0F0;--gray-200:#E0E0E0;--gray-400:#9CA3AF;--gray-600:#4B5563;
+  --sidebar:220px;--r-sm:8px;--r-md:12px;
+  --fb:#1877F2;--go:#EA4335;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Poppins',sans-serif;background:var(--gray-50);color:var(--black);display:flex;min-height:100vh;overflow-x:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);background:var(--black);position:fixed;top:0;left:0;height:100vh;display:flex;flex-direction:column;z-index:100;overflow-y:auto;}
+.sidebar-logo{padding:20px 16px 8px;border-bottom:1px solid #222;}
+.sidebar-logo img{height:32px;display:block;}
+.sidebar-logo .client{color:var(--yellow);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-top:6px;}
+.nav{padding:16px 0;flex:1;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:#aaa;font-size:12px;font-weight:500;cursor:pointer;border-left:3px solid transparent;transition:all .15s;}
+.nav-item:hover,.nav-item.active{color:var(--white);background:#1a1a1a;border-left-color:var(--yellow);}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;}
+.sidebar-footer{padding:12px 16px;border-top:1px solid #222;color:#555;font-size:10px;}
+
+/* MAIN */
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-width:0;}
+
+/* TOPBAR */
+.topbar{background:var(--white);border-bottom:1px solid var(--gray-200);padding:12px 24px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.topbar-title{font-size:13px;font-weight:600;color:var(--black);margin-right:8px;white-space:nowrap;}
+.filter-group{display:flex;align-items:center;gap:6px;}
+.filter-label{font-size:11px;color:var(--gray-600);font-weight:500;white-space:nowrap;}
+select{font-family:'Poppins',sans-serif;font-size:11px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--r-sm);background:var(--white);color:var(--black);cursor:pointer;outline:none;}
+select:focus{border-color:var(--yellow);}
+.filter-sep{width:1px;height:20px;background:var(--gray-200);}
+.btn-reset{font-family:'Poppins',sans-serif;font-size:11px;font-weight:500;padding:6px 12px;background:var(--black);color:var(--white);border:none;border-radius:var(--r-sm);cursor:pointer;}
+.btn-reset:hover{background:#333;}
+.last-update{margin-left:auto;font-size:10px;color:var(--gray-400);}
+
+/* CONTENT */
+.content{padding:20px 24px;flex:1;}
+.section-title{font-size:13px;font-weight:600;color:var(--black);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-title span{display:inline-block;width:3px;height:14px;background:var(--yellow);border-radius:2px;}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;}
+.kpi-card{background:var(--white);border-radius:var(--r-md);padding:16px;border:1px solid var(--gray-200);}
+.kpi-label{font-size:10px;color:var(--gray-600);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.kpi-value{font-size:22px;font-weight:700;color:var(--black);line-height:1;}
+.kpi-sub{font-size:10px;color:var(--gray-400);margin-top:4px;}
+.kpi-bar-wrap{margin-top:8px;}
+.kpi-bar-row{display:flex;justify-content:space-between;font-size:10px;color:var(--gray-600);margin-bottom:3px;}
+.kpi-bar{height:5px;background:var(--gray-200);border-radius:99px;overflow:hidden;}
+.kpi-bar-fill{height:100%;border-radius:99px;transition:width .4s;}
+.fill-green{background:#16a34a;}
+.fill-orange{background:#d97706;}
+.fill-red{background:#dc2626;}
+.fill-yellow{background:var(--yellow);}
+
+/* CANAL CARDS */
+.canal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px;}
+.canal-card{background:var(--white);border-radius:var(--r-md);padding:16px;border:1px solid var(--gray-200);display:flex;align-items:center;gap:14px;}
+.canal-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.canal-icon.fb{background:#e7f0fd;}
+.canal-icon.go{background:#fce8e6;}
+.canal-icon svg{width:20px;height:20px;}
+.canal-info{flex:1;}
+.canal-name{font-size:11px;font-weight:600;color:var(--gray-600);margin-bottom:2px;}
+.canal-inv{font-size:18px;font-weight:700;color:var(--black);}
+.canal-leads{font-size:11px;color:var(--gray-400);margin-top:1px;}
+.canal-pct{font-size:12px;font-weight:600;color:var(--gray-600);text-align:right;}
+
+/* MES A MES */
+.table-card{background:var(--white);border-radius:var(--r-md);border:1px solid var(--gray-200);margin-bottom:24px;overflow:hidden;}
+.table-header{padding:14px 16px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;}
+.table-header-title{font-size:12px;font-weight:600;}
+.table-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+thead th{background:var(--black);color:var(--white);font-weight:600;padding:9px 12px;text-align:left;white-space:nowrap;}
+thead th.num{text-align:right;}
+tbody tr{border-bottom:1px solid var(--gray-100);}
+tbody tr:last-child{border-bottom:none;}
+tbody td{padding:8px 12px;color:var(--gray-600);white-space:nowrap;}
+tbody td.num{text-align:right;}
+tbody tr:hover td{background:var(--gray-50);}
+.mes-row td{font-weight:600;color:var(--black);cursor:pointer;background:var(--gray-50);}
+.mes-row:hover td{background:var(--gray-100) !important;}
+.sub-row{display:none;}
+.sub-row td{padding-left:24px;color:var(--gray-600);}
+.sub-row td:first-child::before{content:'↳ ';color:var(--gray-400);}
+.toggle-icon{display:inline-block;transition:transform .2s;margin-right:6px;color:var(--yellow);}
+.toggle-icon.open{transform:rotate(90deg);}
+.total-row td{font-weight:700;color:var(--black);background:var(--gray-50);border-top:2px solid var(--gray-200) !important;}
+
+/* PROG TABLES */
+.prog-section{margin-bottom:24px;}
+.prog-header{background:var(--black);color:var(--white);padding:10px 16px;border-radius:var(--r-md) var(--r-md) 0 0;display:flex;align-items:center;justify-content:space-between;}
+.prog-header-title{font-size:12px;font-weight:600;}
+.prog-badge{background:var(--yellow);color:var(--black);font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
+thead th.sortable{cursor:pointer;user-select:none;}
+thead th.sortable:hover{background:#222;}
+thead th.sort-active{color:var(--yellow);}
+.pct-bar{display:inline-flex;align-items:center;gap:6px;width:100%;}
+.pct-bar-bg{flex:1;height:4px;background:var(--gray-200);border-radius:99px;overflow:hidden;min-width:40px;}
+.pct-bar-fill{height:100%;border-radius:99px;}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(10,10,10,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:14px;}
+#loading .ld-logo{color:var(--yellow);font-size:24px;font-weight:700;letter-spacing:2px;}
+#loading .ld-msg{color:#aaa;font-size:12px;}
+.spinner{width:32px;height:32px;border:3px solid #333;border-top-color:var(--yellow);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:40px 20px;color:var(--gray-400);font-size:12px;}
+
+@media(max-width:1200px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .canal-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="ld-logo">ADCOM</div>
+  <div class="spinner"></div>
+  <div class="ld-msg" id="ld-msg">Cargando datos...</div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <svg width="90" height="22" viewBox="0 0 90 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="18" font-family="Poppins,sans-serif" font-size="18" font-weight="700" fill="#FFC000">ADCOM</text>
+    </svg>
+    <div class="client">UAN · Pauta Digital</div>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" onclick="scrollTo(0,0)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Resumen
+    </div>
+    <div class="nav-item" onclick="document.getElementById('sec-canales').scrollIntoView({behavior:'smooth'})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      Canales
+    </div>
+    <div class="nav-item" onclick="document.getElementById('sec-mes').scrollIntoView({behavior:'smooth'})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Mes a Mes
+    </div>
+    <div class="nav-item" onclick="document.getElementById('sec-prog').scrollIntoView({behavior:'smooth'})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Programas
+    </div>
+  </div>
+  <div class="sidebar-footer">v1.0 · 2026</div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">Tablero Pauta</span>
+    <div class="filter-sep"></div>
+    <div class="filter-group">
+      <span class="filter-label">Desde</span>
+      <input type="date" id="f-desde" style="font-family:Poppins,sans-serif;font-size:11px;padding:6px 8px;border:1px solid var(--gray-200);border-radius:8px;outline:none;" onchange="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Hasta</span>
+      <input type="date" id="f-hasta" style="font-family:Poppins,sans-serif;font-size:11px;padding:6px 8px;border:1px solid var(--gray-200);border-radius:8px;outline:none;" onchange="applyFilters()">
+    </div>
+    <div class="filter-sep"></div>
+    <div class="filter-group">
+      <span class="filter-label">Nivel</span>
+      <select id="f-nivel" onchange="cascadeFilters('nivel')">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Ciudad</span>
+      <select id="f-ciudad" onchange="cascadeFilters('ciudad')">
+        <option value="">Todas</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Facultad</span>
+      <select id="f-facultad" onchange="applyFilters()">
+        <option value="">Todas</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Canal</span>
+      <select id="f-canal" onchange="applyFilters()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+    <span class="last-update" id="last-update"></span>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- KPIs -->
+    <div class="section-title"><span></span>KPIs Generales</div>
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- CANALES -->
+    <div class="section-title" id="sec-canales"><span></span>Inversión por Canal</div>
+    <div class="canal-grid" id="canal-grid"></div>
+
+    <!-- MES A MES -->
+    <div class="section-title" id="sec-mes"><span></span>Inversión Mes a Mes</div>
+    <div class="table-card">
+      <div class="table-scroll">
+        <table id="tbl-mes">
+          <thead><tr>
+            <th>Mes</th>
+            <th class="num">Inversión Total</th>
+            <th class="num">Facebook</th>
+            <th class="num">Google</th>
+            <th class="num">Leads</th>
+            <th class="num">CPL</th>
+          </tr></thead>
+          <tbody id="body-mes"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROGRAMAS -->
+    <div class="section-title" id="sec-prog"><span></span>Resultados por Programa</div>
+    <div id="prog-container"></div>
+
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const SHEET_ID = '1xD4bQUbtp3Dqc71jGaxsMQOZMSEPoiycce1lstj5DLE';
+const GID_RG   = '1846504808';
+const GID_META = '577768057';
+const URL_RG   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_RG}`;
+const URL_META = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_META}`;
+
+const MESES_ES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let RAW_RG = [], RAW_META = [];
+let filtered = [];
+let progSort = {};
+
+// ─── PARSERS ─────────────────────────────────────────────────────────────────
+function parseInv(v){
+  const c = String(v).replace(/[$\s]/g,'').replace(/\./g,'').replace(',','.');
+  return parseFloat(c)||0;
+}
+function parseLeads(v){
+  const c = String(v).replace(/[$\s]/g,'').replace(',','.');
+  return Math.round(parseFloat(c)||0);
+}
+function parseFecha(v){
+  const m = String(v).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m){ const y=m[3],mo=m[2].padStart(2,'0'),d=m[1].padStart(2,'0');
+    return {mes:y+'-'+mo, full:y+'-'+mo+'-'+d}; }
+  // try ISO
+  const iso = String(v).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(iso){ const y=iso[1],mo=iso[2].padStart(2,'0'),d=iso[3].padStart(2,'0');
+    return {mes:y+'-'+mo, full:y+'-'+mo+'-'+d}; }
+  return {mes:'',full:''};
+}
+function fmtCOP(n){ return n&&!isNaN(n)&&n!==0?'$'+Math.round(n).toLocaleString('es-CO'):'—';}
+function fmtN(n){ return n&&!isNaN(n)&&n!==0?Math.round(n).toLocaleString('es-CO'):'—';}
+function fmtMes(m){ const p=m.split('-');return MESES_ES[parseInt(p[1])]+' '+p[0];}
+
+// ─── LOAD ─────────────────────────────────────────────────────────────────────
+let done=0, rendered=false;
+function tryRender(){
+  if(++done===2 && !rendered){
+    rendered=true;
+    buildFilters();
+    applyFilters();
+    document.getElementById('loading').style.display='none';
+    document.getElementById('last-update').textContent='Actualizado: '+new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+document.getElementById('ld-msg').textContent = 'Cargando Resumen General...';
+Papa.parse(URL_RG, {download:true, header:false, skipEmptyLines:true, complete: r=>{
+  let rows = r.data;
+  if(rows.length && /date|fecha/i.test(String(rows[0][0]))) rows.shift();
+  RAW_RG = rows.map(row=>({
+    fecha:    parseFecha(row[0]),
+    campaign: String(row[1]||''),
+    inv:      parseInv(row[4]),
+    leads:    parseLeads(row[5]),
+    canal:    String(row[6]||'').trim(),
+    ciudad:   String(row[7]||'').trim().toUpperCase(),
+    facultad: String(row[9]||'').trim(),
+    nivel:    String(row[10]||'').trim(),
+    prog:     String(row[11]||'').trim(),
+  })).filter(r=>r.fecha.full);
+  document.getElementById('ld-msg').textContent='Cargando Metas...';
+  tryRender();
+}});
+
+Papa.parse(URL_META, {download:true, header:false, skipEmptyLines:true, complete: r=>{
+  let rows = r.data;
+  if(rows.length && /periodo/i.test(String(rows[0][0]))) rows.shift();
+  RAW_META = rows.map(row=>({
+    periodo:   String(row[0]||''),
+    fIni:      parseFecha(row[1]).full,
+    fFin:      parseFecha(row[2]).full,
+    ciudad:    String(row[3]||'').trim().toUpperCase(),
+    facultad:  String(row[5]||'').trim(),
+    nivel:     String(row[6]||'').trim(),
+    prog:      String(row[8]||'').trim(),
+    presup:    parseInv(row[10]),
+    cpl_meta:  parseInv(row[11]),
+    leads_meta:parseLeads(row[12]),
+    mat_meta:  parseLeads(row[15]),
+  }));
+  tryRender();
+}});
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function buildFilters(){
+  const niveles  = [...new Set(RAW_RG.map(r=>r.nivel).filter(Boolean))].sort();
+  const ciudades = [...new Set(RAW_RG.map(r=>r.ciudad).filter(Boolean))].sort();
+  const facultades=[...new Set(RAW_RG.map(r=>r.facultad).filter(Boolean))].sort();
+  const canales  = [...new Set(RAW_RG.map(r=>r.canal).filter(Boolean))].sort();
+
+  fillSelect('f-nivel',   niveles);
+  fillSelect('f-ciudad',  ciudades);
+  fillSelect('f-facultad',facultades);
+  fillSelect('f-canal',   canales);
+
+  // Set default date range
+  const fechas = RAW_RG.map(r=>r.fecha.full).filter(Boolean).sort();
+  if(fechas.length){
+    document.getElementById('f-desde').value = fechas[0];
+    document.getElementById('f-hasta').value = fechas[fechas.length-1];
+  }
+}
+
+function fillSelect(id, opts, selected=''){
+  const el = document.getElementById(id);
+  const first = el.options[0];
+  el.innerHTML='';
+  el.appendChild(first);
+  opts.forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; if(o===selected)opt.selected=true; el.appendChild(opt); });
+}
+
+function cascadeFilters(changed){
+  const nivel   = document.getElementById('f-nivel').value;
+  const ciudad  = document.getElementById('f-ciudad').value;
+
+  let pool = RAW_RG;
+  if(nivel)  pool = pool.filter(r=>r.nivel===nivel);
+  if(changed==='nivel' && nivel){
+    const cs=[...new Set(pool.map(r=>r.ciudad).filter(Boolean))].sort();
+    fillSelect('f-ciudad', cs, ciudad);
+  }
+  if(ciudad) pool = pool.filter(r=>r.ciudad===ciudad);
+  const fs=[...new Set(pool.map(r=>r.facultad).filter(Boolean))].sort();
+  const curFac = document.getElementById('f-facultad').value;
+  fillSelect('f-facultad', fs, fs.includes(curFac)?curFac:'');
+
+  applyFilters();
+}
+
+function resetFilters(){
+  ['f-nivel','f-ciudad','f-facultad','f-canal'].forEach(id=>document.getElementById(id).value='');
+  buildFilters();
+  applyFilters();
+}
+
+function applyFilters(){
+  const desde   = document.getElementById('f-desde').value;
+  const hasta   = document.getElementById('f-hasta').value;
+  const nivel   = document.getElementById('f-nivel').value;
+  const ciudad  = document.getElementById('f-ciudad').value;
+  const facultad= document.getElementById('f-facultad').value;
+  const canal   = document.getElementById('f-canal').value;
+
+  filtered = RAW_RG.filter(r=>{
+    if(desde && r.fecha.full < desde) return false;
+    if(hasta && r.fecha.full > hasta) return false;
+    if(nivel    && r.nivel    !== nivel)    return false;
+    if(ciudad   && r.ciudad   !== ciudad)   return false;
+    if(facultad && r.facultad !== facultad) return false;
+    if(canal    && r.canal    !== canal)    return false;
+    return true;
+  });
+
+  renderAll(desde, hasta);
+}
+
+// ─── GET METAS ────────────────────────────────────────────────────────────────
+function getMeta(prog, nivel, ciudad, facultad, fDesde, fHasta){
+  // Match: prog + nivel + facultad (+ optionally ciudad)
+  const norm = s => String(s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const kP = norm(prog), kN = norm(nivel), kF = norm(facultad), kC = norm(ciudad);
+
+  const matches = RAW_META.filter(m=>{
+    if(norm(m.nivel)!==kN) return false;
+    if(norm(m.facultad)!==kF) return false;
+    if(norm(m.prog)!==kP) return false;
+    // ciudad filter if set
+    if(ciudad && norm(m.ciudad)!==kC) return false;
+    // date overlap
+    if(fDesde && fHasta && m.fIni && m.fFin){
+      if(m.fFin < fDesde || m.fIni > fHasta) return false;
+    }
+    return true;
+  });
+
+  return matches.reduce((acc,m)=>({
+    leads_meta: acc.leads_meta + m.leads_meta,
+    mat_meta:   acc.mat_meta   + m.mat_meta,
+    presup:     acc.presup     + m.presup,
+  }),{leads_meta:0, mat_meta:0, presup:0});
+}
+
+// ─── RENDER ALL ───────────────────────────────────────────────────────────────
+function renderAll(desde, hasta){
+  const inv_total   = filtered.reduce((a,r)=>a+r.inv,0);
+  const leads_total = filtered.reduce((a,r)=>a+r.leads,0);
+  const cpl         = leads_total>0 ? inv_total/leads_total : 0;
+
+  // metas globales según filtros
+  const nivel_f   = document.getElementById('f-nivel').value;
+  const ciudad_f  = document.getElementById('f-ciudad').value;
+  const facultad_f= document.getElementById('f-facultad').value;
+
+  // aggregate metas from filtered prog combinations
+  let meta_leads_total=0, meta_mat_total=0, presup_total=0;
+  const progKeys = new Set(filtered.map(r=>r.prog+'||'+r.nivel+'||'+r.facultad+'||'+r.ciudad));
+  progKeys.forEach(k=>{
+    const [p,n,f,c] = k.split('||');
+    const m = getMeta(p,n,c,f,desde,hasta);
+    meta_leads_total += m.leads_meta;
+    meta_mat_total   += m.mat_meta;
+    presup_total     += m.presup;
+  });
+
+  const pct_leads  = meta_leads_total>0 ? Math.min((leads_total/meta_leads_total)*100,200) : null;
+  const pct_presup = presup_total>0     ? Math.min((inv_total/presup_total)*100,200)        : null;
+
+  renderKPIs(inv_total, leads_total, cpl, pct_leads, meta_leads_total, pct_presup, presup_total);
+  renderCanales();
+  renderMes();
+  renderProgramas(desde, hasta);
+}
+
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
+function barColor(pct){ return pct>=80?'fill-green':pct>=50?'fill-orange':'fill-red'; }
+function kpiBar(pct, label, metaFmt){
+  if(pct===null) return '';
+  const c = barColor(pct);
+  return `<div class="kpi-bar-wrap">
+    <div class="kpi-bar-row"><span>${label}</span><span>${pct.toFixed(0)}%${metaFmt?' · Meta: '+metaFmt:''}</span></div>
+    <div class="kpi-bar"><div class="kpi-bar-fill ${c}" style="width:${Math.min(pct,100)}%"></div></div>
+  </div>`;
+}
+
+function renderKPIs(inv, leads, cpl, pct_leads, meta_leads, pct_presup, presup){
+  const g = document.getElementById('kpi-grid');
+  g.innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Inversión Total</div>
+      <div class="kpi-value">${fmtCOP(inv)}</div>
+      ${kpiBar(pct_presup,'vs Presupuesto', fmtCOP(presup))}
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Leads Plataforma</div>
+      <div class="kpi-value">${fmtN(leads)}</div>
+      ${kpiBar(pct_leads,'vs Meta', fmtN(meta_leads))}
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">CPL</div>
+      <div class="kpi-value">${fmtCOP(cpl)}</div>
+      <div class="kpi-sub">Costo por Lead</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Registros</div>
+      <div class="kpi-value">${filtered.length.toLocaleString('es-CO')}</div>
+      <div class="kpi-sub">Filas activas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Programas</div>
+      <div class="kpi-value">${new Set(filtered.map(r=>r.prog)).size}</div>
+      <div class="kpi-sub">con inversión</div>
+    </div>
+  `;
+}
+
+// ─── CANALES ─────────────────────────────────────────────────────────────────
+function renderCanales(){
+  const byCanal = {};
+  filtered.forEach(r=>{
+    if(!byCanal[r.canal]) byCanal[r.canal]={inv:0,leads:0};
+    byCanal[r.canal].inv   += r.inv;
+    byCanal[r.canal].leads += r.leads;
+  });
+  const inv_total = filtered.reduce((a,r)=>a+r.inv,0);
+
+  const icons = {
+    Facebook: `<svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07z"/></svg>`,
+    Google: `<svg viewBox="0 0 24 24"><path fill="#EA4335" d="M5.27 9.76A7.08 7.08 0 0112 4.9c1.7 0 3.23.62 4.42 1.63l3.3-3.3A11.95 11.95 0 0012 0C7.37 0 3.37 2.69 1.38 6.63l3.89 3.13z"/><path fill="#34A853" d="M16.04 18.01A7.03 7.03 0 0112 19.1c-2.97 0-5.5-1.84-6.63-4.47l-3.93 3.05A11.95 11.95 0 0012 24c3.24 0 6.18-1.22 8.41-3.21l-4.37-2.78z"/><path fill="#FBBC05" d="M19.1 12c0-.66-.07-1.31-.18-1.94H12v3.76h3.99a3.41 3.41 0 01-1.46 2.22l4.36 2.78A11.93 11.93 0 0019.1 12z"/><path fill="#4285F4" d="M5.37 14.63A7.13 7.13 0 014.9 12c0-.92.17-1.81.47-2.63L1.38 6.24A11.94 11.94 0 000 12c0 1.97.47 3.82 1.3 5.46l4.07-2.83z"/></svg>`,
+  };
+  const cls = {Facebook:'fb', Google:'go'};
+
+  const g = document.getElementById('canal-grid');
+  if(!Object.keys(byCanal).length){ g.innerHTML='<div class="empty-state">Sin datos para los filtros seleccionados</div>'; return; }
+
+  g.innerHTML = Object.entries(byCanal).sort((a,b)=>b[1].inv-a[1].inv).map(([canal,d])=>{
+    const pct = inv_total>0 ? (d.inv/inv_total*100).toFixed(1) : 0;
+    const ic = icons[canal]||`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>`;
+    return `<div class="canal-card">
+      <div class="canal-icon ${cls[canal]||''}">${ic}</div>
+      <div class="canal-info">
+        <div class="canal-name">${canal}</div>
+        <div class="canal-inv">${fmtCOP(d.inv)}</div>
+        <div class="canal-leads">${fmtN(d.leads)} leads · CPL ${fmtCOP(d.leads>0?d.inv/d.leads:0)}</div>
+      </div>
+      <div class="canal-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── MES A MES ────────────────────────────────────────────────────────────────
+function renderMes(){
+  const mesMap = {};
+  filtered.forEach(r=>{
+    const m = r.fecha.mes;
+    if(!m) return;
+    if(!mesMap[m]) mesMap[m]={inv:0,fb:0,go:0,leads:0};
+    mesMap[m].inv   += r.inv;
+    mesMap[m].leads += r.leads;
+    if(r.canal==='Facebook') mesMap[m].fb += r.inv;
+    if(r.canal==='Google')   mesMap[m].go += r.inv;
+  });
+
+  const meses = Object.keys(mesMap).sort();
+  const body = document.getElementById('body-mes');
+  if(!meses.length){ body.innerHTML='<tr><td colspan="6" class="empty-state">Sin datos</td></tr>'; return; }
+
+  let rows='';
+  let tI=0,tFB=0,tGO=0,tL=0;
+  meses.forEach(m=>{
+    const d=mesMap[m];
+    tI+=d.inv; tFB+=d.fb; tGO+=d.go; tL+=d.leads;
+    const cpl = d.leads>0?d.inv/d.leads:0;
+    rows+=`<tr class="mes-row" onclick="toggleMes('${m}')">
+      <td><span class="toggle-icon" id="ti-${m}">▶</span>${fmtMes(m)}</td>
+      <td class="num">${fmtCOP(d.inv)}</td>
+      <td class="num">${fmtCOP(d.fb)}</td>
+      <td class="num">${fmtCOP(d.go)}</td>
+      <td class="num">${fmtN(d.leads)}</td>
+      <td class="num">${fmtCOP(cpl)}</td>
+    </tr>`;
+
+    // sub rows por canal
+    const canalesM = {};
+    filtered.filter(r=>r.fecha.mes===m).forEach(r=>{
+      if(!canalesM[r.canal]) canalesM[r.canal]={inv:0,leads:0};
+      canalesM[r.canal].inv+=r.inv; canalesM[r.canal].leads+=r.leads;
+    });
+    Object.entries(canalesM).sort((a,b)=>b[1].inv-a[1].inv).forEach(([c,cd])=>{
+      rows+=`<tr class="sub-row" data-mes="${m}">
+        <td>${c}</td>
+        <td class="num">${fmtCOP(cd.inv)}</td>
+        <td class="num">${c==='Facebook'?fmtCOP(cd.inv):'—'}</td>
+        <td class="num">${c==='Google'?fmtCOP(cd.inv):'—'}</td>
+        <td class="num">${fmtN(cd.leads)}</td>
+        <td class="num">${fmtCOP(cd.leads>0?cd.inv/cd.leads:0)}</td>
+      </tr>`;
+    });
+  });
+
+  const tCPL = tL>0?tI/tL:0;
+  rows+=`<tr class="total-row">
+    <td>TOTAL</td>
+    <td class="num">${fmtCOP(tI)}</td>
+    <td class="num">${fmtCOP(tFB)}</td>
+    <td class="num">${fmtCOP(tGO)}</td>
+    <td class="num">${fmtN(tL)}</td>
+    <td class="num">${fmtCOP(tCPL)}</td>
+  </tr>`;
+  body.innerHTML=rows;
+}
+
+function toggleMes(m){
+  const icon = document.getElementById('ti-'+m);
+  icon.classList.toggle('open');
+  const rows = document.querySelectorAll(`tr.sub-row[data-mes="${m}"]`);
+  const show = icon.classList.contains('open');
+  rows.forEach(r=>r.style.display = show ? 'table-row' : 'none');
+}
+
+// ─── PROGRAMAS ────────────────────────────────────────────────────────────────
+function renderProgramas(desde, hasta){
+  const ciudad_f   = document.getElementById('f-ciudad').value;
+  const facultad_f = document.getElementById('f-facultad').value;
+  const nivel_f    = document.getElementById('f-nivel').value;
+
+  // group by nivel → facultad → prog
+  const groups = {}; // groups[nivel][facultad][prog_key] = {inv,fb,go,leads,ciudad,nivel,facultad,prog}
+  filtered.forEach(r=>{
+    if(!groups[r.nivel]) groups[r.nivel]={};
+    if(!groups[r.nivel][r.facultad]) groups[r.nivel][r.facultad]={};
+    const key = r.prog;
+    if(!groups[r.nivel][r.facultad][key]) groups[r.nivel][r.facultad][key]={inv:0,fb:0,go:0,leads:0,ciudad:r.ciudad,nivel:r.nivel,facultad:r.facultad,prog:r.prog};
+    const g = groups[r.nivel][r.facultad][key];
+    g.inv+=r.inv; g.leads+=r.leads;
+    if(r.canal==='Facebook') g.fb+=r.inv;
+    if(r.canal==='Google')   g.go+=r.inv;
+  });
+
+  const container = document.getElementById('prog-container');
+  if(!Object.keys(groups).length){ container.innerHTML='<div class="empty-state">Sin datos para los filtros seleccionados</div>'; return; }
+
+  let html='';
+  const niveles = Object.keys(groups).sort();
+  niveles.forEach(nivel=>{
+    const facs = Object.keys(groups[nivel]).sort();
+    facs.forEach(fac=>{
+      const gkey = nivel+'||'+fac;
+      if(!progSort[gkey]) progSort[gkey]={col:'inv',dir:-1};
+      const rows = Object.values(groups[nivel][fac]);
+
+      // sort
+      const s = progSort[gkey];
+      rows.sort((a,b)=>s.dir*(a[s.col]||0 < b[s.col]||0 ? -1 : 1));
+      // recalc with metas
+      const rowsM = rows.map(r=>{
+        const m = getMeta(r.prog, r.nivel, r.ciudad, r.facultad, desde, hasta);
+        return {...r, leads_meta:m.leads_meta, mat_meta:m.mat_meta, presup:m.presup};
+      });
+      // re-sort after meta enrichment
+      rowsM.sort((a,b)=> s.dir*(b[s.col]-a[s.col]));
+
+      const tI=rowsM.reduce((a,r)=>a+r.inv,0);
+      const tFB=rowsM.reduce((a,r)=>a+r.fb,0);
+      const tGO=rowsM.reduce((a,r)=>a+r.go,0);
+      const tL=rowsM.reduce((a,r)=>a+r.leads,0);
+      const tML=rowsM.reduce((a,r)=>a+r.leads_meta,0);
+
+      const th=(col,lbl,isNum)=>{
+        const act=s.col===col;
+        return `<th class="${isNum?'num ':''} sortable${act?' sort-active':''}" onclick="sortProg('${gkey}','${col}')">${lbl}${act?(s.dir>0?' ↑':' ↓'):''}</th>`;
+      };
+
+      html+=`<div class="prog-section">
+        <div class="prog-header">
+          <div class="prog-header-title">${nivel} · ${fac}</div>
+          <span class="prog-badge">${rowsM.length} programas</span>
+        </div>
+        <div class="table-card" style="border-radius:0 0 var(--r-md) var(--r-md);border-top:none;">
+          <div class="table-scroll"><table>
+            <thead><tr>
+              ${th('prog','Programa',false)}
+              ${th('inv','Inversión Total',true)}
+              ${th('fb','Facebook',true)}
+              ${th('go','Google',true)}
+              ${th('leads','Leads',true)}
+              ${th('leads_meta','Meta Leads',true)}
+              <th class="num">% Cum.</th>
+              <th class="num">CPL</th>
+            </tr></thead>
+            <tbody>
+              ${rowsM.map(r=>{
+                const cpl=r.leads>0?r.inv/r.leads:0;
+                const pct=r.leads_meta>0?(r.leads/r.leads_meta*100):null;
+                const pctFmt = pct!==null?`<div class="pct-bar"><div class="pct-bar-bg"><div class="pct-bar-fill ${barColor(pct)}" style="width:${Math.min(pct,100)}%"></div></div><span style="white-space:nowrap;font-size:10px">${pct.toFixed(0)}%</span></div>`:'—';
+                return `<tr>
+                  <td>${r.prog}</td>
+                  <td class="num">${fmtCOP(r.inv)}</td>
+                  <td class="num">${fmtCOP(r.fb)}</td>
+                  <td class="num">${fmtCOP(r.go)}</td>
+                  <td class="num">${fmtN(r.leads)}</td>
+                  <td class="num">${r.leads_meta>0?fmtN(r.leads_meta):'—'}</td>
+                  <td class="num">${pctFmt}</td>
+                  <td class="num">${fmtCOP(cpl)}</td>
+                </tr>`;
+              }).join('')}
+              <tr class="total-row">
+                <td>TOTAL</td>
+                <td class="num">${fmtCOP(tI)}</td>
+                <td class="num">${fmtCOP(tFB)}</td>
+                <td class="num">${fmtCOP(tGO)}</td>
+                <td class="num">${fmtN(tL)}</td>
+                <td class="num">${tML>0?fmtN(tML):'—'}</td>
+                <td class="num">${tML>0?(tL/tML*100).toFixed(0)+'%':'—'}</td>
+                <td class="num">${fmtCOP(tL>0?tI/tL:0)}</td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>`;
+    });
+  });
+
+  container.innerHTML = html;
+}
+
+function sortProg(gkey, col){
+  const s = progSort[gkey];
+  if(s.col===col) s.dir*=-1; else { s.col=col; s.dir=-1; }
+  const desde = document.getElementById('f-desde').value;
+  const hasta  = document.getElementById('f-hasta').value;
+  renderProgramas(desde, hasta);
+}
+</script>
+</body>
+</html>
