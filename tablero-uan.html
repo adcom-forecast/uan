@@ -102,6 +102,7 @@ tbody tr:hover td{background:var(--gray-50);}
 .tr-mes:hover td{background:var(--gray-100) !important;}
 .tr-sub{display:none;}
 .tr-sub td{padding-left:24px;}
+.tr-ciudad-subtotal td{border-top:1px solid var(--gray-200);background:var(--gray-50) !important;}
 .tog{display:inline-block;transition:transform .18s;margin-right:5px;color:var(--yellow);font-size:10px;}
 .tog.open{transform:rotate(90deg);}
 
@@ -384,13 +385,24 @@ function applyFilters(){
 }
 
 // ── METAS HELPER (by facultad+nivel, con overlap de fechas) ──────────────────
-function getMetas(facultad,nivel,fDesde,fHasta){
+// ciudad_f: si está activo, solo suma metas de esa ciudad
+function getMetas(facultad,nivel,fDesde,fHasta,ciudad_f){
   const kF=norm(facultad),kN=norm(nivel);
   return RAW_META.filter(m=>{
     if(norm(m.facultad)!==kF||norm(m.nivel)!==kN)return false;
+    if(ciudad_f&&norm(m.ciudad)!==norm(ciudad_f))return false;
     if(fDesde&&fHasta&&m.fIni&&m.fFin){if(m.fFin<fDesde||m.fIni>fHasta)return false;}
     return true;
   }).reduce((a,m)=>({leads_meta:a.leads_meta+m.leads_meta,presup:a.presup+m.presup,mat_meta:a.mat_meta+m.mat_meta}),{leads_meta:0,presup:0,mat_meta:0});
+}
+// metas por facultad+nivel+ciudad especifica (drop de ciudad en tabla facultad)
+function getMetasFacCiudad(facultad,nivel,ciudad,fDesde,fHasta){
+  const kF=norm(facultad),kN=norm(nivel),kC=norm(ciudad);
+  return RAW_META.filter(m=>{
+    if(norm(m.facultad)!==kF||norm(m.nivel)!==kN||norm(m.ciudad)!==kC)return false;
+    if(fDesde&&fHasta&&m.fIni&&m.fFin){if(m.fFin<fDesde||m.fIni>fHasta)return false;}
+    return true;
+  }).reduce((a,m)=>({leads_meta:a.leads_meta+m.leads_meta,presup:a.presup+m.presup}),{leads_meta:0,presup:0});
 }
 function getMetasCiudad(ciudad,fDesde,fHasta){
   const kC=norm(ciudad);
@@ -607,13 +619,16 @@ function renderCiudad(desde,hasta){
       if(r.canal==='Facebook')nivM[r.nivel].fb+=r.inv;
       if(r.canal==='Google')nivM[r.nivel].go+=r.inv;
     });
-    Object.entries(nivM).sort((a,b)=>b[1].inv-a[1].inv).forEach(([nv,nd])=>{
+    const nivEntries=Object.entries(nivM).sort((a,b)=>b[1].inv-a[1].inv);
+    let subInvT=0,subLeadsT=0,subMetaT=0;
+    nivEntries.forEach(([nv,nd])=>{
       const nmeta=getMetasCiudadNivel(c.ciudad,nv,desde,hasta);
       const npct=nmeta.leads_meta>0?(nd.leads/nmeta.leads_meta*100):null;
       const nfbP=nd.inv>0?Math.round(nd.fb/nd.inv*100):0;
       const ngoP=nd.inv>0?Math.round(nd.go/nd.inv*100):0;
       const npctDisp=npct!==null?npct.toFixed(1)+'%':'—';
       const npctCls=npct!==null?pctColor(npct):'';
+      subInvT+=nd.inv;subLeadsT+=nd.leads;subMetaT+=nmeta.leads_meta;
       rows+=`<tr class="tr-ciudad-sub" data-cid="${cid}">
         <td style="padding-left:28px">${nv}</td>
         <td class="r">${fCOP(nd.inv)}</td>
@@ -625,6 +640,21 @@ function renderCiudad(desde,hasta){
         <td class="r" style="color:var(--yellow);font-weight:600">${fCOP(nd.leads>0?nd.inv/nd.leads:0)}</td>
       </tr>`;
     });
+    if(nivEntries.length>1){
+      const stPct=subMetaT>0?(subLeadsT/subMetaT*100):null;
+      const stPctDisp=stPct!==null?stPct.toFixed(1)+'%':'—';
+      const stCls=stPct!==null?pctColor(stPct):'';
+      rows+=`<tr class="tr-ciudad-sub tr-ciudad-subtotal" data-cid="${cid}">
+        <td style="padding-left:28px;font-weight:700;color:var(--black)">Total ${c.ciudad}</td>
+        <td class="r" style="font-weight:700;color:var(--black)">${fCOP(subInvT)}</td>
+        <td class="r" style="font-weight:700;color:var(--black)">100%</td>
+        <td>—</td>
+        <td class="r" style="font-weight:700;color:var(--black)">${fN(subLeadsT)}</td>
+        <td class="r" style="font-weight:700;color:var(--black)">${subMetaT>0?fN(subMetaT):'—'}</td>
+        <td class="r"><span class="${stCls}" style="font-weight:700">${stPctDisp}</span></td>
+        <td class="r" style="color:var(--yellow);font-weight:700">${fCOP(subLeadsT>0?subInvT/subLeadsT:0)}</td>
+      </tr>`;
+    }
   });
   // total row
   const tLeads=cities.reduce((a,c)=>a+c.leads,0);
@@ -659,7 +689,7 @@ function renderFacultad(desde,hasta,ciudad_f){
   container.innerHTML='';
   ['Pregrado','Posgrado'].forEach(nv=>{
     const rows=Object.values(fmap).filter(r=>r.nivel===nv).map(r=>{
-      const m=getMetas(r.facultad,r.nivel,desde,hasta);
+      const m=getMetas(r.facultad,r.nivel,desde,hasta,ciudad_f);
       return{...r,leads_meta:m.leads_meta,presup:m.presup,cpl:r.leads>0?r.inv/r.leads:0,pct:m.leads_meta>0?(r.leads/m.leads_meta*100):null};
     });
     if(!rows.length)return;
@@ -682,7 +712,6 @@ function renderFacultad(desde,hasta,ciudad_f){
         <span class="fac-badge">${rows.length} facultades</span>
       </div>
       <div class="tcard" style="border-radius:0 0 var(--r-md) var(--r-md);border-top:none;">
-        <div class="search-wrap"><input type="text" placeholder="Buscar facultad..." oninput="filterFacTable('${nv}',this.value)"></div>
         <div class="tscroll"><table id="tbl-fac-${nv}">
           <thead><tr>
             ${th('facultad','Facultad',false)}
@@ -693,11 +722,37 @@ function renderFacultad(desde,hasta,ciudad_f){
             ${th('cpl','CPL',true)}
           </tr></thead>
           <tbody id="tbody-fac-${nv}">
-          ${rows.map(r=>{
+          ${rows.map((r,ri)=>{
             const pctDisp=r.pct!==null?r.pct.toFixed(1)+'%':'—';
             const pctCls=r.pct!==null?pctColor(r.pct):'';
             const pctBar=r.pct!==null?`<div class="pct-inline"><div class="pct-bg"><div class="pct-fill ${barClass(r.pct)}" style="width:${Math.min(r.pct,100)}%"></div></div><span class="${pctCls}">${pctDisp}</span></div>`:'—';
-            return `<tr data-fac="${r.facultad.toLowerCase()}"><td>${r.facultad}</td><td class="r">${fCOP(r.inv)}</td><td class="r">${fN(r.leads)}</td><td class="r">${r.leads_meta>0?fN(r.leads_meta):'—'}</td><td class="r">${pctBar}</td><td class="r" style="color:var(--yellow);font-weight:600">${fCOP(r.cpl)}</td></tr>`;
+            const facId='fac_'+nv.replace(/[^a-zA-Z]/g,'')+'_'+ri;
+            // build city sub-rows for this facultad+nivel
+            const cityData={};
+            FILTERED.filter(f=>f.facultad===r.facultad&&f.nivel===r.nivel).forEach(f=>{
+              if(!cityData[f.ciudad])cityData[f.ciudad]={inv:0,leads:0};
+              cityData[f.ciudad].inv+=f.inv;cityData[f.ciudad].leads+=f.leads;
+            });
+            const cityRows=Object.entries(cityData).sort((a,b)=>b[1].inv-a[1].inv).map(([c,cd])=>{
+              const cm=getMetasFacCiudad(r.facultad,r.nivel,c,desde,hasta);
+              const cp=cm.leads_meta>0?(cd.leads/cm.leads_meta*100):null;
+              return `<tr class="tr-fac-city" data-fid="${facId}" style="display:none">
+                <td style="padding-left:24px;font-size:10px;color:var(--gray-400)">${c}</td>
+                <td class="r" style="font-size:10px">${fCOP(cd.inv)}</td>
+                <td class="r" style="font-size:10px">${fN(cd.leads)}</td>
+                <td class="r" style="font-size:10px">${cm.leads_meta>0?fN(cm.leads_meta):'—'}</td>
+                <td class="r">${cp!==null?`<div class="pct-inline"><div class="pct-bg"><div class="pct-fill ${barClass(cp)}" style="width:${Math.min(cp,100)}%"></div></div><span class="${pctColor(cp)}" style="font-size:10px">${cp.toFixed(1)}%</span></div>`:'—'}</td>
+                <td class="r" style="font-size:10px;color:var(--yellow);font-weight:600">${fCOP(cd.leads>0?cd.inv/cd.leads:0)}</td>
+              </tr>`;
+            }).join('');
+            return `<tr data-fac="${r.facultad.toLowerCase()}" onclick="togFacCity('${facId}')" style="cursor:pointer">
+              <td><span class="tog" id="tif-${facId}" style="font-size:9px;margin-right:5px;color:var(--yellow)">▶</span>${r.facultad}</td>
+              <td class="r">${fCOP(r.inv)}</td>
+              <td class="r">${fN(r.leads)}</td>
+              <td class="r">${r.leads_meta>0?fN(r.leads_meta):'—'}</td>
+              <td class="r">${pctBar}</td>
+              <td class="r" style="color:var(--yellow);font-weight:600">${fCOP(r.cpl)}</td>
+            </tr>${cityRows}`;
           }).join('')}
           <tr class="tr-total"><td>TOTAL</td><td class="r">${fCOP(tI)}</td><td class="r">${fN(tL)}</td><td class="r">${tM>0?fN(tM):'—'}</td><td class="r">${tM>0?(tL/tM*100).toFixed(1)+'%':'—'}</td><td class="r" style="color:var(--yellow);font-weight:600">${fCOP(tL>0?tI/tL:0)}</td></tr>
           </tbody>
@@ -706,11 +761,12 @@ function renderFacultad(desde,hasta,ciudad_f){
     container.appendChild(div);
   });
 }
-function filterFacTable(nv,q){
-  const qn=q.toLowerCase();
-  document.querySelectorAll(`#tbody-fac-${nv} tr[data-fac]`).forEach(tr=>{
-    tr.style.display=tr.dataset.fac.includes(qn)?''  :'none';
-  });
+function togFacCity(fid){
+  const ic=document.getElementById('tif-'+fid);
+  if(!ic)return;
+  ic.classList.toggle('open');
+  const show=ic.classList.contains('open');
+  document.querySelectorAll(`tr.tr-fac-city[data-fid="${fid}"]`).forEach(r=>r.style.display=show?'table-row':'none');
 }
 function sortFac(nv,col){
   const s=facSort[nv]||{col:'inv',dir:-1};
